@@ -1,0 +1,148 @@
+@import url(https://fonts.googleapis.com/css?family=Open+Sans:400,700);
+@import url(https://fonts.googleapis.com/css?family=Numans);
+html, body {
+  background-image: url('http://getwallpapers.com/wallpaper/full/2/b/1/962581-large-ocean-background-images-1920x1080-smartphone.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  font-family: 'Numans', sans-serif;
+  height: 100%;
+}
+
+body {
+  font-family: 'Open Sans', sans-serif;
+}
+
+.container {
+  height: 100%;
+  align-content: center;
+}
+
+.navbar, .card {
+  background-color: rgba(0, 0, 0, 0.25) !important;
+}
+
+.input-group-prepend span, .login-btn {
+  background-color: #FFC312;
+  color: black;
+  border: 0 !important;
+}
+
+input:focus {
+  outline: 0 0 0 0 !important;
+  box-shadow: 0 0 0 0 !important;
+}
+
+.remember {
+  color: white;
+}
+
+.remember input {
+  width: 20px;
+  height: 20px;
+  margin-left: 15px;
+  margin-right: 5px;
+}
+
+.btn {
+  width: 100px;
+  padding: .25rem .5rem;
+  font-size: .875rem;
+  line-height: 1.5;
+  border-radius: .2rem;
+  margin: 1px;
+}
+
+.btn:hover {
+  color: black;
+  background-color: white;
+  cursor: pointer;
+}
+
+.links {
+  color: white;
+}
+
+.links a {
+  margin-left: 4px;
+}
+
+.has-error {
+  border: 2px solid red;
+  border-radius: 5px;
+}
+
+.custom-file-label {
+  color: #495057;
+  padding: 0;
+  font-size: .875rem;
+  font-weight: 400;
+  line-height: 1.5;
+  height: calc(1.8125rem + 2px);
+  border: none;
+  right: 30px;
+}
+
+input[type=file] {
+  cursor: pointer;
+}
+
+.custom-file-label .input-group-text {
+  padding: .215rem .75rem;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.custom-file-label label {
+  padding: .375rem .5rem;
+}
+
+.custom-file-label::after {
+  color: #495057;
+  content: "";
+  background-color: #FFC312;
+  height: 0;
+  width: 0;
+  display: none;
+}
+
+::-webkit-input-placeholder {
+  /* Edge */
+  color: #495057!important;
+}
+
+:-ms-input-placeholder {
+  /* Internet Explorer */
+  color: #495057!important;
+}
+
+::placeholder {
+  color: #495057!important;
+}
+
+.card-columns {
+  column-count: 3;
+}
+
+.card-columns-2 {
+  column-count: 2;
+}
+
+.bg-yellow {
+  background-color: #FFC312;
+}
+
+.fixed-header-table tbody {
+  display: block;
+  height: 200px;
+  overflow: auto;
+}
+
+.fixed-header-table thead, .fixed-header-table tbody tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.fixed-header-table thead {
+  width: calc( 100% - 1em)
+}

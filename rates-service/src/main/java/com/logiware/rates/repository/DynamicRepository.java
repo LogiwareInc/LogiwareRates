@@ -12,10 +12,12 @@ import java.util.Map;
 import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.logiware.edi.entity.Company;
 import com.logiware.rates.datasource.DataSourceManager;
 import com.logiware.rates.dto.KeyValue;
 import com.mysql.cj.jdbc.StatementImpl;
@@ -26,7 +28,8 @@ public class DynamicRepository {
 	@Autowired
 	private DataSourceManager dataSourceManager;
 
-	public List<KeyValue> getOptionResults(String dbUrl, String dbUser, String dbPassword, String query, Map<String, Object> params) throws SQLException {
+	public List<KeyValue> getOptionResults(String dbUrl, String dbUser, String dbPassword, String query,
+			Map<String, Object> params) throws SQLException {
 		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
 		NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
 		MapSqlParameterSource parameterSource = new MapSqlParameterSource();
@@ -43,7 +46,8 @@ public class DynamicRepository {
 		return results;
 	}
 
-	public List<KeyValue> getTypeaheadResults(String dbUrl, String dbUser, String dbPassword, String query, String input) throws SQLException {
+	public List<KeyValue> getTypeaheadResults(String dbUrl, String dbUser, String dbPassword, String query,
+			String input) throws SQLException {
 		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
 		NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
 		MapSqlParameterSource parameterSource = new MapSqlParameterSource();
@@ -56,16 +60,18 @@ public class DynamicRepository {
 		return results;
 	}
 
-	public int executeUpdate(String dbUrl, String dbUser, String dbPassword, String query, MapSqlParameterSource parameterSource) {
+	public int executeUpdate(String dbUrl, String dbUser, String dbPassword, String query,
+			MapSqlParameterSource parameterSource) {
 		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
 		NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
-		parameterSource.getValues().forEach((k,v) -> {
-			System.out.println(k+" == "+v);
+		parameterSource.getValues().forEach((k, v) -> {
+			System.out.println(k + " == " + v);
 		});
 		return jdbcTemplate.update(query, parameterSource);
 	}
 
-	public Integer executeUpdate(String dbUrl, String dbUser, String dbPassword, String query, InputStream is) throws SQLException {
+	public Integer executeUpdate(String dbUrl, String dbUser, String dbPassword, String query, InputStream is)
+			throws SQLException {
 		if (!dbUrl.contains("allowLoadLocalInfile")) {
 			dbUrl += (dbUrl.contains("?") ? "" : "?") + "allowLoadLocalInfile=true";
 		}
@@ -78,4 +84,24 @@ public class DynamicRepository {
 		return count;
 	}
 
+	public void executeUpdate(String dbUrl, String dbUser, String dbPassword, String query) {
+		if (!dbUrl.contains("allowLoadLocalInfile")) {
+			dbUrl += (dbUrl.contains("?") ? "" : "?") + "allowLoadLocalInfile=true";
+		}
+		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
+		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+		jdbcTemplate.execute(query);
+	}
+
+	public String getSingleValueQuery(String dbUrl, String dbUser, String dbPassword, String queryStr) {
+		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
+		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+		return jdbcTemplate.queryForObject(queryStr, String.class);
+	}
+	
+	public int executeUpdateWithoutParam(String dbUrl, String dbUser, String dbPassword, String query) {
+		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
+		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+		return jdbcTemplate.update(query);
+	}
 }

@@ -30,7 +30,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "site")
+@Table(name = "partner")
 @Builder(toBuilder = true)
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
@@ -38,7 +38,7 @@ import lombok.ToString;
 @Setter(value = AccessLevel.PUBLIC)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @ToString(onlyExplicitlyIncluded = true)
-public class Site implements Serializable {
+public class Partner implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 	@Id
@@ -48,19 +48,11 @@ public class Site implements Serializable {
 	@EqualsAndHashCode.Include
 	@ToString.Include
 	private Long id;
-	@Basic(optional = false)
-	@Column(name = "name")
-	private String name;
-	@Column(name = "db_url")
-	private String dbUrl;
-	@Column(name = "db_user")
-	private String dbUser;
-	@Column(name = "db_password")
-	private String dbPassword;
 	@JoinColumn(name = "company_id", referencedColumnName = "id")
 	@ManyToOne(optional = false)
 	private Company company;
-	@OneToMany(cascade = CascadeType.ALL, mappedBy = "site")
-	private List<SiteFile> siteFiles;
+	@JoinColumn(name = "partner_id", referencedColumnName = "id")
+	@ManyToOne(optional = false)
+	private Company partner;
 
 }

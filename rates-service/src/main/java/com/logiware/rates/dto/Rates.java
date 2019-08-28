@@ -1,5 +1,7 @@
 package com.logiware.rates.dto;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -10,11 +12,10 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 @Getter(value = AccessLevel.PUBLIC)
 @Setter(value = AccessLevel.PUBLIC)
-public class UserDetail {
-	
-	private String userName;
-	private String company;
-	private String role;
-	private String logo;
-	
+public class Rates {
+
+	private String shipmentType;
+	private String rateType;
+	private String partnerIds;
+	private MultipartFile file;
 }

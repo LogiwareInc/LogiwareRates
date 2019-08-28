@@ -15,7 +15,6 @@ import javax.persistence.JoinColumn;
 import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
@@ -52,24 +51,15 @@ public class File implements Serializable {
 	@Column(name = "name")
 	private String name;
 	@Basic(optional = false)
+    @Lob
 	@Column(name = "path")
 	private String path;
 	@Basic(optional = false)
-	@Column(name = "carrier")
-	private String carrier;
+	@Column(name = "shipment_type")
+	private String shipmentType;
 	@Basic(optional = false)
-	@Column(name = "scac")
-	private String scac;
-	@Column(name = "effective_date")
-	private Date effectiveDate;
-	@Column(name = "expiration_date")
-	private Date expirationDate;
-	@Column(name = "surcharge_type")
-	private String surchargeType;
-	@Column(name = "surcharge_currency")
-	private String surchargeCurrency;
-	@Column(name = "rate_basis")
-	private String rateBasis;
+	@Column(name = "rates_type")
+	private String ratesType;
 	@Basic(optional = false)
 	@Column(name = "loaded_date")
 	@Temporal(TemporalType.TIMESTAMP)
@@ -78,6 +68,6 @@ public class File implements Serializable {
 	@ManyToOne(optional = false)
 	private Company company;
 	@OneToMany(cascade = CascadeType.ALL, mappedBy = "file")
-	private List<SiteFile> siteFiles;
+	private List<History> histories;
 
 }

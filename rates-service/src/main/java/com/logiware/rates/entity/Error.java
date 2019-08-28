@@ -5,20 +5,16 @@ import java.util.Date;
 import java.util.List;
 
 import javax.persistence.Basic;
-import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
-import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
 import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
+
+import com.logiware.rates.entity.File.FileBuilder;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -30,7 +26,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "site_file")
+@Table(name = "file")
 @Builder(toBuilder = true)
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
@@ -38,8 +34,8 @@ import lombok.ToString;
 @Setter(value = AccessLevel.PUBLIC)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @ToString(onlyExplicitlyIncluded = true)
-public class SiteFile implements Serializable {
-
+public class Error implements Serializable {
+	
 	private static final long serialVersionUID = 1L;
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,11 +44,14 @@ public class SiteFile implements Serializable {
 	@EqualsAndHashCode.Include
 	@ToString.Include
 	private Long id;
-	@JoinColumn(name = "site_id", referencedColumnName = "id")
+	@Basic(optional = false)
+	@Column(name = "type")
+	private String type;
+	@Basic(optional = false)
+	@Column(name = "error")
+	private String error;
+	@JoinColumn(name = "history_id", referencedColumnName = "id")
 	@ManyToOne(optional = false)
-	private Site site;
-	@JoinColumn(name = "file_id", referencedColumnName = "id")
-	@ManyToOne(optional = false)
-	private File file;
-
+	private History history;
+	
 }

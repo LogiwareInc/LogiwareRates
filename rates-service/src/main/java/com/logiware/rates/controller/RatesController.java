@@ -1,31 +1,31 @@
 package com.logiware.rates.controller;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
-import com.logiware.rates.constant.ErrorMessageConstant;
-import com.logiware.rates.dto.ErrorMsg;
+import com.logiware.rates.constant.SecurityConstants;
 import com.logiware.rates.dto.KeyValue;
-import com.logiware.rates.dto.ResultModel;
+import com.logiware.rates.dto.Rates;
 import com.logiware.rates.entity.Company;
-import com.logiware.rates.entity.User;
+import com.logiware.rates.service.CompanyService;
 import com.logiware.rates.service.RatesService;
-import com.logiware.rates.service.UserService;
 
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
@@ -37,97 +37,78 @@ import io.swagger.annotations.ApiResponses;
 @RequestMapping("/rates")
 public class RatesController {
 
+	@Value("${spring.security.jwt.token.name}")
+	private String tokenName;
+	
 	@Autowired
-	private UserService userService;
+	private CompanyService companyService;
+
 	@Autowired
 	private RatesService ratesService;
 
-	@GetMapping("/typeahead")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "typeahead data", response = List.class),
-			@ApiResponse(code = 400, message = "bad credentials", response = ErrorMsg.class) })
-	@ApiOperation(value = "Get Typeahead Results")
-	@ApiImplicitParams({ @ApiImplicitParam(name = "rates-token", dataType = "string", paramType = "header") })
-	public @ResponseBody ResponseEntity<?> getTypeaheadResults(@RequestParam String type, @RequestParam String input, HttpServletRequest req) {
+	@GetMapping(value = "/authenticate")
+	@ApiOperation(value = "Authenticate")
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "Authenticated Successfully"), @ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
+	public @ResponseBody ResponseEntity<?> getTokenByLogin(@RequestParam(name = "companyName", required = true) String companyName, HttpServletResponse res) {
 		try {
-			User user = userService.whoami(req);
-			List<KeyValue> results = ratesService.getTypeaheadResults(user.getCompany(), type, input);
-			return new ResponseEntity<List<KeyValue>>(results, HttpStatus.OK);
+			Company company = companyService.findByName(companyName);
+			if (company == null) {
+				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
+			}
+			String token = companyService.getTokenyByLogin(companyName);
+			return ResponseEntity.ok().header(tokenName, token).header("Access-Control-Expose-Headers", tokenName)
+					.body(Collections.singletonMap("companyName", companyName));
 		} catch (Exception e) {
-			return new ResponseEntity<ErrorMsg>(new ErrorMsg(ErrorMessageConstant.LOGIN_400), HttpStatus.BAD_REQUEST);
+			e.printStackTrace();
+			return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
 		}
 	}
 
-	@GetMapping("/options")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "typeahead data", response = List.class),
-			@ApiResponse(code = 400, message = "bad credentials", response = ErrorMsg.class) })
-	@ApiOperation(value = "Get Options Results")
-	@ApiImplicitParams({ @ApiImplicitParam(name = "rates-token", dataType = "string", paramType = "header") })
-	public @ResponseBody ResponseEntity<?> getOptionResults(@RequestParam String type, HttpServletRequest req) {
-		try {
-			User user = userService.whoami(req);
-			List<KeyValue> results = ratesService.getOptionResults(user.getCompany(), type);
-			return new ResponseEntity<List<KeyValue>>(results, HttpStatus.OK);
-		} catch (Exception e) {
-			return new ResponseEntity<ErrorMsg>(new ErrorMsg(ErrorMessageConstant.LOGIN_400), HttpStatus.BAD_REQUEST);
-		}
-	}
-
-	@GetMapping("/sites")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "typeahead data", response = List.class),
-			@ApiResponse(code = 400, message = "bad credentials", response = ErrorMsg.class) })
-	@ApiOperation(value = "Get Sites")
-	@ApiImplicitParams({ @ApiImplicitParam(name = "rates-token", dataType = "string", paramType = "header") })
+	@GetMapping(value = "/partners")
+	@ApiOperation(value = "Get Partners")
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "Partners Sent Successfully", response = List.class),
+			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
+	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
 	public @ResponseBody ResponseEntity<?> getSites(HttpServletRequest req) {
 		try {
-			User user = userService.whoami(req);
-			Company company = user.getCompany();
-			List<KeyValue> sites = new ArrayList<>();
-			company.getSites().forEach(site -> {
-				sites.add(new KeyValue(site.getId(), site.getName()));
+			Company company = companyService.whoami(req);
+			if (company == null) {
+				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
+			}
+			List<KeyValue> partners = new ArrayList<>();
+			partners.add(new KeyValue(company.getId(), company.getName()));
+			company.getPartners().forEach(partner -> {
+				partners.add(new KeyValue(partner.getPartner().getId(), partner.getPartner().getName()));
 			});
-			return new ResponseEntity<List<KeyValue>>(sites, HttpStatus.OK);
+			return ResponseEntity.ok().body(partners);
 		} catch (Exception e) {
-			return new ResponseEntity<ErrorMsg>(new ErrorMsg(ErrorMessageConstant.LOGIN_400), HttpStatus.BAD_REQUEST);
+			e.printStackTrace();
+			return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
 		}
 	}
 
-	@PostMapping("/load")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "rates", response = Map.class), @ApiResponse(code = 400, message = "bad credentials", response = ErrorMsg.class) })
+	@PostMapping(value = "/load")
 	@ApiOperation(value = "Load Rates")
-	@ApiImplicitParams({ @ApiImplicitParam(name = "rates-token", dataType = "string", paramType = "header") })
-	public @ResponseBody ResponseEntity<?> saveTemplate(@RequestParam("carrier") String carrier, @RequestParam("scac") String scac,
-			@RequestParam("effectiveDate") String effectiveDate, @RequestParam("expirationDate") String expirationDate, @RequestParam("surchargeType") String surchargeType,
-			@RequestParam("surchargeCurrency") String surchargeCurrency, @RequestParam("sites") String sites, @RequestParam("file") MultipartFile file, HttpServletRequest req) {
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates are loaded Successfully", response = Map.class),
+			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
+	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
+	public @ResponseBody ResponseEntity<?> sendDocument(@ModelAttribute Rates rates, HttpServletRequest req) {
 		try {
-			User user = userService.whoami(req);
-			Map<String, List<KeyValue>> errors = ratesService.loadRates(user.getCompany(), carrier, scac, effectiveDate, expirationDate, surchargeType, surchargeCurrency, sites,
-					file);
+			Company company = companyService.whoami(req);
+			if (company == null) {
+				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
+			}
+			Map<String, List<KeyValue>> errors = ratesService.loadRates(company, rates);
 			Map<String, Object> response = new HashMap<>();
 			response.put("message", "Rates are loaded successfully");
 			if (!errors.isEmpty()) {
 				response.put("errors", errors);
 			}
-			return new ResponseEntity<Map<String, Object>>(response, HttpStatus.OK);
+			return ResponseEntity.ok().body(response);
 		} catch (Exception e) {
 			e.printStackTrace();
-			return new ResponseEntity<ErrorMsg>(new ErrorMsg(ErrorMessageConstant.LOGIN_400), HttpStatus.BAD_REQUEST);
+			return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
 		}
 	}
-
-	@PostMapping("/search")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "rates", response = List.class), @ApiResponse(code = 400, message = "bad credentials", response = ErrorMsg.class) })
-	@ApiOperation(value = "Search Rates")
-	@ApiImplicitParams({ @ApiImplicitParam(name = "rates-token", dataType = "string", paramType = "header") })
-	public @ResponseBody ResponseEntity<?> saveTemplate(@RequestParam("carrier") String carrier, @RequestParam("fromDate") String fromDate, @RequestParam("toDate") String toDate,
-			HttpServletRequest req) {
-		try {
-			User user = userService.whoami(req);
-			List<ResultModel> results = ratesService.searchRates(user.getCompany(), carrier, fromDate, toDate);
-			return new ResponseEntity<List<ResultModel>>(results, HttpStatus.OK);
-		} catch (Exception e) {
-			e.printStackTrace();
-			return new ResponseEntity<ErrorMsg>(new ErrorMsg(ErrorMessageConstant.LOGIN_400), HttpStatus.BAD_REQUEST);
-		}
-	}
-
+	
 }

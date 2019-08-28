@@ -3,7 +3,6 @@ package com.logiware.rates.security.jwt;
 import java.io.IOException;
 import java.util.Base64;
 import java.util.Date;
-import java.util.Enumeration;
 
 import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
@@ -12,16 +11,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.logiware.rates.entity.Role;
-import com.logiware.rates.entity.User;
-import com.logiware.rates.service.CustomUserDetailsService;
-import com.logiware.rates.service.UserService;
+import com.logiware.rates.entity.Company;
+import com.logiware.rates.service.CompanyService;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -32,30 +29,31 @@ import io.jsonwebtoken.SignatureAlgorithm;
 @Component
 public class JwtTokenProvider {
 
-	@Value("${security.jwt.token.secret-key:secret}")
-	private String secretKey = "secret";
+	@Value("${spring.security.jwt.token.secret-key}")
+	private String secretKey;
 
-	@Value("${security.jwt.token.expire-length:864000000}")
-	private long validityInMilliseconds = 864000000; // 10days
+	@Value("${spring.security.jwt.token.expire-length}")
+	private long expiryLength; // 1h
 
+	@Value("${spring.security.jwt.token.granted-roles}")
+	private String grantedRoles;
+
+	@Value("${spring.security.jwt.token.name}")
+	private String tokenName;
+	
 	@Autowired
-	private CustomUserDetailsService userDetailsService;
-	@Autowired
-	private UserService userService;
+	private CompanyService companyService;
 
 	@PostConstruct
 	protected void init() {
 		secretKey = Base64.getEncoder().encodeToString(secretKey.getBytes());
 	}
 
-	public String createToken(String username, Role role) {
-
+	public String createToken(String username) {
 		Claims claims = Jwts.claims().setSubject(username);
-		claims.put("roles", role.getName());
-
+		claims.put("grantedRoles", grantedRoles);
 		Date now = new Date();
-		Date validity = new Date(now.getTime() + validityInMilliseconds);
-
+		Date validity = new Date(now.getTime() + expiryLength);
 		return Jwts.builder()//
 				.setClaims(claims)//
 				.setIssuedAt(now)//
@@ -65,19 +63,18 @@ public class JwtTokenProvider {
 	}
 
 	public Authentication getAuthentication(String token) {
-		UserDetails userDetails = userDetailsService.loadUserByUsername(getUsername(token));
-		return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
+		Company company = companyService.findByName(getCompanyName(token));
+		return new UsernamePasswordAuthenticationToken(company, null, AuthorityUtils.createAuthorityList(grantedRoles));
 	}
 
-	public String getUsername(String token) {
+	public String getCompanyName(String token) {
 		return Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody().getSubject();
 	}
 
 	public String resolveToken(HttpServletRequest req) {
-		Enumeration<String> headerNames = req.getHeaderNames();
-		String ratesToken = req.getHeader("rates-token");
-		if (ratesToken != null) {
-			return ratesToken;
+		String token = req.getHeader(tokenName);
+		if (token != null) {
+			return token;
 		}
 		return null;
 	}
@@ -85,11 +82,9 @@ public class JwtTokenProvider {
 	public boolean validateToken(String token) {
 		try {
 			Jws<Claims> claims = Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token);
-
 			if (claims.getBody().getExpiration().before(new Date())) {
 				return false;
 			}
-
 			return true;
 		} catch (JwtException | IllegalArgumentException e) {
 			throw new InvalidJwtAuthenticationException("Expired or invalid JWT token");
@@ -105,10 +100,9 @@ public class JwtTokenProvider {
 		try {
 			Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody().setExpiration(date);
 		} catch (Exception e) {
-			// Expired or invalid JWT token
+			e.printStackTrace();
 		}
-		User user = userService.findByUsername(username);
-		return createToken(username, user.getRole());
+		return createToken(username);
 	}
 
 }

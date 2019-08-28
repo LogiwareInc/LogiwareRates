@@ -50,10 +50,6 @@ public class Company implements Serializable {
 	@Column(name = "name")
 	private String name;
 	@Basic(optional = false)
-	@Lob
-	@Column(name = "logo")
-	private byte[] logo;
-	@Basic(optional = false)
 	@Column(name = "db_url")
 	private String dbUrl;
 	@Basic(optional = false)
@@ -63,17 +59,20 @@ public class Company implements Serializable {
 	@Column(name = "db_password")
 	private String dbPassword;
 	@Basic(optional = false)
-	@Column(name = "loading_query")
-	private String loadingQuery;
+	@Column(name = "container_sizes")
+	private String containerSizes;
+	@Basic(optional = false)
+	@Column(name = "cost_types")
+	private String costTypes;
 	@Basic(optional = false)
 	@Column(name = "created_date")
 	@Temporal(TemporalType.TIMESTAMP)
 	private Date createdDate;
 	@OneToMany(cascade = CascadeType.ALL, mappedBy = "company")
-	private List<User> users;
-	@OneToMany(cascade = CascadeType.ALL, mappedBy = "company")
-	private List<Site> sites;
+	private List<Partner> partners;
 	@OneToMany(cascade = CascadeType.ALL, mappedBy = "company")
 	private List<File> files;
+	@OneToMany(cascade = CascadeType.ALL, mappedBy = "company")
+	private List<History> histories;
 
 }

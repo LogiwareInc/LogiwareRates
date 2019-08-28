@@ -1,11 +1,12 @@
 package com.logiware.rates.service;
 
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.sql.SQLException;
-import java.sql.Types;
-import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -15,361 +16,517 @@ import java.util.stream.Stream;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.poi.hssf.usermodel.HSSFDateUtil;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.FormulaEvaluator;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.logiware.rates.dto.KeyValue;
-import com.logiware.rates.dto.ResultModel;
+import com.logiware.rates.dto.Rates;
 import com.logiware.rates.entity.Company;
 import com.logiware.rates.entity.File;
-import com.logiware.rates.entity.Site;
-import com.logiware.rates.entity.SiteFile;
-import com.logiware.rates.repository.CustomRepository;
+import com.logiware.rates.entity.History;
+import com.logiware.rates.repository.CompanyRepository;
 import com.logiware.rates.repository.DynamicRepository;
 import com.logiware.rates.repository.FileRepository;
-import com.logiware.rates.repository.SiteFileRepository;
-import com.logiware.rates.repository.SiteRepository;
+import com.logiware.rates.repository.HistoryRepository;
 import com.logiware.rates.util.DateUtils;
+import com.logiware.rates.util.StringUtils;
+import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
 
 @Service
 public class RatesService {
 
-	@Value("${upload.path}")
-	private String uploadPath;
+	@Value("${spring.servlet.multipart.location}")
+	private String uploadLocation;
 
 	@Autowired
 	private DynamicRepository dynamicRepository;
 
 	@Autowired
-	private SiteRepository siteRepository;
+	private CompanyRepository companyRepository;
 
 	@Autowired
 	private FileRepository fileRepository;
 
 	@Autowired
-	private SiteFileRepository siteFileRepository;
+	private HistoryRepository historyRepository;
 
-	@Autowired
-	private CustomRepository customRepository;
+	private java.io.File xls2csv(java.io.File xlsFile) throws Exception {
+		String path = xlsFile.getPath();
+		java.io.File csvFile = new java.io.File(FilenameUtils.getFullPath(path) + FilenameUtils.getName(path).replace(".xlsx", ".csv"));
+		try (XSSFWorkbook wb = new XSSFWorkbook(FileUtils.openInputStream(xlsFile));
+				CSVWriter cw = new CSVWriter(new FileWriter(csvFile), CSVWriter.DEFAULT_SEPARATOR, CSVWriter.DEFAULT_QUOTE_CHARACTER, CSVWriter.DEFAULT_ESCAPE_CHARACTER,
+						CSVWriter.RFC4180_LINE_END);) {
+			XSSFSheet sheet = wb.getSheetAt(0);
+			Row row;
+			Cell cell;
+			List<String[]> lines = new ArrayList<>();
+			FormulaEvaluator evaluator = wb.getCreationHelper().createFormulaEvaluator();
 
-	@Value("${spring.datasource.url}")
-	private String dbUrl;
-	@Value("${spring.datasource.username}")
-	private String dbUser;
-	@Value("${spring.datasource.password}")
-	private String dbPassword;
-
-	public List<KeyValue> getOptionResults(Company company, String type) throws SQLException {
-		StringBuilder builder = new StringBuilder();
-		Map<String, Object> params = new HashMap<>();
-		switch (type) {
-		case "currencies":
-			builder.append("select");
-			builder.append("  gc.`code` as col1,");
-			builder.append("  gc.`description` as col2 ");
-			builder.append("from");
-			builder.append("  `code_type` ct");
-			builder.append("  join `generic_code` gc");
-			builder.append("    on (gc.`code_type_id` = ct.`id`) ");
-			builder.append("where ct.`description` = 'Currency' ");
-			builder.append("order by coalesce(gc.`prior`, '0')");
-			break;
+			for (int rowIndex = 0; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+				row = sheet.getRow(rowIndex);
+				String[] line = new String[row.getLastCellNum()];
+				for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
+					cell = row.getCell(cellIndex);
+					if (null != cell) {
+						switch (cell.getCellType()) {
+						case BOOLEAN:
+							line[cellIndex] = "" + cell.getBooleanCellValue();
+							break;
+						case NUMERIC:
+							if (HSSFDateUtil.isCellDateFormatted(cell)) {
+								line[cellIndex] = DateUtils.formatToString(cell.getDateCellValue(), "MM/dd/yyyy");
+							} else {
+								line[cellIndex] = "" + cell.getNumericCellValue();
+							}
+							break;
+						case FORMULA:
+							CellType cellType = evaluator.evaluateFormulaCell(cell);
+							switch (cellType) {
+							case BOOLEAN:
+								line[cellIndex] = "" + cell.getBooleanCellValue();
+								break;
+							case NUMERIC:
+								if (HSSFDateUtil.isCellDateFormatted(cell)) {
+									line[cellIndex] = DateUtils.formatToString(cell.getDateCellValue(), "MM/dd/yyyy");
+								} else {
+									line[cellIndex] = "" + cell.getNumericCellValue();
+								}
+								break;
+							case BLANK:
+								line[cellIndex] = "";
+								break;
+							default:
+								line[cellIndex] = cell.getStringCellValue();
+								break;
+							}
+							break;
+						case BLANK:
+							line[cellIndex] = "";
+							break;
+						default:
+							line[cellIndex] = cell.getStringCellValue();
+							break;
+						}
+					} else {
+						line[cellIndex] = "";
+					}
+				}
+				lines.add(line);
+			}
+			cw.writeAll(lines);
 		}
-		return dynamicRepository.getOptionResults(company.getDbUrl(), company.getDbUser(), company.getDbPassword(),
-				builder.toString(), params);
+		return csvFile;
 	}
 
-	public List<KeyValue> getTypeaheadResults(Company company, String type, String input) throws SQLException {
-		StringBuilder builder = new StringBuilder();
-		switch (type) {
-		case "carrier":
+	public void loadFclFreightRates(Company company, java.io.File file) throws FileNotFoundException, IOException, SQLException {
+		StringBuilder tableBuilder = new StringBuilder();
+		tableBuilder.append("create table `fcl_rate_temp` (");
+		tableBuilder.append("  `id` int(10) not null auto_increment,");
+
+		StringBuilder loadBuilder = new StringBuilder();
+		loadBuilder.append("load data local infile '").append(file.getPath().replace("\\", "/")).append("'");
+		loadBuilder.append("  into ");
+		loadBuilder.append("table `fcl_rate_temp` character set 'utf8mb4'");
+		loadBuilder.append("  fields terminated by ','");
+		loadBuilder.append("  optionally enclosed by '\"'");
+		loadBuilder.append("  lines terminated by '\\r\\n'");
+		loadBuilder.append("  ignore 1 lines");
+		loadBuilder.append("  (");
+		Map<String, List<String>> freightRates = new HashMap<>();
+		List<String> containerSizes = Arrays.asList(company.getContainerSizes().split(","));
+		try (CSVReader reader = new CSVReader(new FileReader(file));) {
+			String[] nextLine;
+			List<String> headers = new ArrayList<>();
+			while ((nextLine = reader.readNext()) != null) {
+				headers.addAll(Arrays.asList(nextLine));
+				break;
+			}
+			for (String header : headers) {
+				if (StringUtils.isNotEmpty(header)) {
+					tableBuilder.append("  `").append(header.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_")).append("`");
+					loadBuilder.append(" `").append(header.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_")).append("`,");
+					if (containerSizes.stream().anyMatch(header::contains)) {
+						String chargeCode = StringUtils.substringBefore(header, " ");
+						if (StringUtils.isNotEqual(chargeCode, "Total")) {
+							String containerSize = StringUtils.substringAfter(header, " ");
+							if (!freightRates.containsKey(containerSize)) {
+								freightRates.put(containerSize, new ArrayList<>());
+							}
+							freightRates.get(containerSize).add(chargeCode);
+						}
+						tableBuilder.append(" decimal(10,2) not null default 0.00,");
+					} else if (header.contains("Comments")) {
+						tableBuilder.append(" text,");
+					} else {
+						tableBuilder.append(" varchar (100) null,");
+					}
+				}
+			}
+			tableBuilder.append("  primary key (`id`)");
+			tableBuilder.append(") engine=innodb charset=utf8mb4 collate=utf8mb4_general_ci");
+			loadBuilder.setLength(loadBuilder.length() - 1);
+			loadBuilder.append(")");
+			String dropQuery = "drop table if exists `fcl_rate_temp`";
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), dropQuery);
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), tableBuilder.toString());
+			dynamicRepository.loadLocalInfile(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), loadBuilder.toString(), FileUtils.openInputStream(file));
+
+			StringBuilder builder = new StringBuilder();
+			builder.append("insert ignore into `fcl_rate` (");
+			builder.append("  `carrier`,");
+			builder.append("  `scac`,");
+			builder.append("  `contract_number`,");
+			builder.append("  `type_of_rate`");
+			builder.append(") ");
 			builder.append("select");
-			builder.append("  tp.`catapult_name` as col1,");
-			builder.append("  mt.`value` as col2 ");
+			builder.append("  temp.`carrier`,");
+			builder.append("  temp.`scac_code`,");
+			builder.append("  temp.`contract_number`,");
+			builder.append("  temp.`type_of_rate` ");
 			builder.append("from");
-			builder.append("  `trading_partner` tp");
-			builder.append("  join `multi_table` mt");
-			builder.append("    on ( ");
-			builder.append("      mt.`trading_partner_id` = tp.`id`");
-			builder.append("      and mt.`property` = '2'");
-			builder.append("      and mt.`value` <> ''");
+			builder.append("  `fcl_rate_temp` temp ");
+			builder.append("where temp.`carrier` <> '' ");
+			builder.append("group by temp.`scac_code`, temp.`contract_number`, temp.`type_of_rate`");
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
+
+			builder.setLength(0);
+			builder.append("delete");
+			builder.append("  route ");
+			builder.append("from");
+			builder.append("  `fcl_rate_temp` temp");
+			builder.append("  join `fcl_rate` rate");
+			builder.append("    on (");
+			builder.append("      rate.`scac` = temp.`scac_code` ");
+			builder.append("      and rate.`contract_number` = temp.`contract_number`");
+			builder.append("      and rate.`type_of_rate` = temp.`type_of_rate`");
+			builder.append("    )");
+			builder.append("  join `fcl_rate_route` route");
+			builder.append("    on (");
+			builder.append("      route.`rate_id` = rate.`id`");
+			builder.append("      and route.`pol_code` = temp.`pol_code`");
+			builder.append("      and route.`pod_code` = temp.`pod_code`");
+			builder.append("      and route.`validity_from` = str_to_date(temp.`validity_from`, '%m/%d/%Y')");
+			builder.append("      and route.`validity_to` = str_to_date(temp.`validity_until`, '%m/%d/%Y')");
 			builder.append("    ) ");
-			builder.append("where tp.`account_type` like '%SS%'");
-			builder.append("  and tp.`catapult_name` like :input");
-			builder.append("  and tp.`active` = 1 ");
-			builder.append("group by tp.`account_number`, mt.`value` ");
-			builder.append("limit 10");
-			break;
-		case "scac":
+			builder.append("where temp.`carrier` <> '' ");
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
+
+			builder.setLength(0);
+			builder.append("insert into `fcl_rate_route` (");
+			builder.append("  `rate_id`,");
+			builder.append("  `origin_country`,");
+			builder.append("  `origin`,");
+			builder.append("  `pol`,");
+			builder.append("  `pol_code`,");
+			builder.append("  `destination_country`,");
+			builder.append("  `pod`,");
+			builder.append("  `pod_code`,");
+			builder.append("  `destination`,");
+			builder.append("  `currency`,");
+			builder.append("  `transit_time`,");
+			builder.append("  `frequency`,");
+			builder.append("  `route`,");
+			builder.append("  `comments`,");
+			builder.append("  `validity_from`,");
+			builder.append("  `validity_to`,");
+			builder.append("  `direction`,");
+			builder.append("  `overseas_agent`,");
+			builder.append("  `shipping_code`,");
+			builder.append("  `naviera_group`,");
+			builder.append("  `bill_policy`,");
+			builder.append("  `contract_closed_by`");
+			builder.append(") ");
 			builder.append("select");
-			builder.append("  mt.`value` as col1,");
-			builder.append("  tp.`catapult_name` as col2 ");
+			builder.append("  rate.`id` as `rate_id`,");
+			builder.append("  temp.`origin_country`,");
+			builder.append("  temp.`origin`,");
+			builder.append("  temp.`pol`,");
+			builder.append("  temp.`pol_code`,");
+			builder.append("  temp.`destination_country`,");
+			builder.append("  temp.`pod`,");
+			builder.append("  temp.`pod_code`,");
+			builder.append("  temp.`destination`,");
+			builder.append("  temp.`currency`,");
+			builder.append("  temp.`transit_time`,");
+			builder.append("  temp.`frequency`,");
+			builder.append("  temp.`route`,");
+			builder.append("  temp.`comments`,");
+			builder.append("  str_to_date(temp.`validity_from`, '%m/%d/%Y'),");
+			builder.append("  str_to_date(temp.`validity_until`, '%m/%d/%Y'),");
+			builder.append("  temp.`direction`,");
+			builder.append("  temp.`overseas_agent`,");
+			builder.append("  temp.`shipping_code`,");
+			builder.append("  temp.`naviera_group`,");
+			builder.append("  temp.`bill_policy_shipping_line`,");
+			builder.append("  temp.`contract_closed_by` ");
 			builder.append("from");
-			builder.append("  `trading_partner` tp");
-			builder.append("  join `multi_table` mt");
-			builder.append("    on ( ");
-			builder.append("      mt.`trading_partner_id` = tp.`id`");
-			builder.append("      and mt.`property` = '2'");
-			builder.append("      and mt.`value` <> ''");
+			builder.append("  `fcl_rate_temp` temp");
+			builder.append("  join `fcl_rate` rate");
+			builder.append("    on (");
+			builder.append("      rate.`scac` = temp.`scac_code` ");
+			builder.append("      and rate.`contract_number` = temp.`contract_number`");
+			builder.append("      and rate.`type_of_rate` = temp.`type_of_rate`");
 			builder.append("    ) ");
-			builder.append("where tp.`account_type` like '%SS%'");
-			builder.append("  and mt.`value` like :input");
-			builder.append("  and tp.`catapult_name` <> ''");
-			builder.append("  and tp.`active` = 1 ");
-			builder.append("group by tp.`account_number`, mt.`value` ");
-			builder.append("limit 10");
-			break;
+			builder.append("where temp.`carrier` <> '' ");
+			builder.append("group by temp.`scac_code`, temp.`contract_number`, temp.`type_of_rate`, temp.`pol_code`, temp.`pod_code`");
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
+
+			builder.setLength(0);
+			builder.append("insert ignore into `fcl_freight_rate` (");
+			builder.append("  `route_id`,");
+			builder.append("  `container_size`,");
+			builder.append("  `charge_code`,");
+			builder.append("  `rate`");
+			builder.append(") ");
+			boolean union = false;
+			for (String containerSize : freightRates.keySet()) {
+				for (String chargeCode : freightRates.get(containerSize)) {
+					String rateField = chargeCode.toLowerCase() + "_" + containerSize.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
+					if (union) {
+						builder.append(" union all");
+					}
+					builder.append("(select");
+					builder.append("  route.`id` as `route_id`,");
+					builder.append("  '").append(containerSize).append("' as `container_size`,");
+					builder.append("  '").append(chargeCode).append("' as `charge_code`,");
+					builder.append("  temp.`").append(rateField).append("` ");
+					builder.append("from");
+					builder.append("  `fcl_rate_temp` temp");
+					builder.append("  join `fcl_rate` rate");
+					builder.append("    on (");
+					builder.append("      rate.`scac` = temp.`scac_code`");
+					builder.append("      and rate.`contract_number` = temp.`contract_number`");
+					builder.append("      and rate.`type_of_rate` = temp.`type_of_rate`");
+					builder.append("    ) ");
+					builder.append("  join `fcl_rate_route` route");
+					builder.append("    on (");
+					builder.append("      route.`rate_id` = rate.`id`");
+					builder.append("      and route.`pol_code` = temp.`pol_code`");
+					builder.append("      and route.`pod_code` = temp.`pod_code`");
+					builder.append("      and route.`validity_from` = str_to_date(temp.`validity_from`, '%m/%d/%Y')");
+					builder.append("      and route.`validity_to` = str_to_date(temp.`validity_until`, '%m/%d/%Y')");
+					builder.append("    ) ");
+					builder.append("where temp.`carrier` <> '' ");
+					builder.append("  and temp.`").append(rateField).append("` <> 0.00)");
+					union = true;
+				}
+			}
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
+
 		}
-		return dynamicRepository.getTypeaheadResults(company.getDbUrl(), company.getDbUser(), company.getDbPassword(),
-				builder.toString(), input);
 	}
 
-	public void removeEmptyRates(Site site) throws SQLException {
-		String query = "delete from `csvrates` where `carrier` = ''";
-		MapSqlParameterSource parameterSource = new MapSqlParameterSource();
-		int count = dynamicRepository.executeUpdate(site.getDbUrl(), site.getDbUser(), site.getDbPassword(), query,
-				parameterSource);
-		System.out.println(count);
+	public void loadFclOtherRates(Company company, java.io.File file) throws FileNotFoundException, IOException, SQLException {
+		StringBuilder tableBuilder = new StringBuilder();
+		tableBuilder.append("create table `fcl_rate_temp` (");
+		tableBuilder.append("  `id` int(10) not null auto_increment,");
+
+		StringBuilder loadBuilder = new StringBuilder();
+		loadBuilder.append("load data local infile '").append(file.getPath().replace("\\", "/")).append("'");
+		loadBuilder.append("  into ");
+		loadBuilder.append("table `fcl_rate_temp` character set 'utf8mb4'");
+		loadBuilder.append("  fields terminated by ','");
+		loadBuilder.append("  optionally enclosed by '\"'");
+		loadBuilder.append("  lines terminated by '\\r\\n'");
+		loadBuilder.append("  ignore 1 lines");
+		loadBuilder.append("  (");
+		List<String> carriers = new ArrayList<>();
+		List<String> costTypes = Arrays.asList(company.getCostTypes().split(","));
+		try (CSVReader reader = new CSVReader(new FileReader(file));) {
+			String[] nextLine;
+			List<String> headers = new ArrayList<>();
+			while ((nextLine = reader.readNext()) != null) {
+				headers.addAll(Arrays.asList(nextLine));
+				break;
+			}
+			for (String header : headers) {
+				if (StringUtils.isNotEmpty(header)) {
+					tableBuilder.append("  `").append(header.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_")).append("` varchar (100) null,");
+					loadBuilder.append("`").append(header.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_")).append("`,");
+					if (StringUtils.isNotEqual(header, "Matrix")) {
+						carriers.add(header);
+					}
+				}
+			}
+			tableBuilder.append("  primary key (`id`)");
+			tableBuilder.append(") engine=innodb charset=utf8mb4 collate=utf8mb4_general_ci");
+			loadBuilder.setLength(loadBuilder.length() - 1);
+			loadBuilder.append(")");
+			String dropQuery = "drop table if exists `fcl_rate_temp`";
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), dropQuery);
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), tableBuilder.toString());
+			dynamicRepository.loadLocalInfile(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), loadBuilder.toString(), FileUtils.openInputStream(file));
+
+			StringBuilder builder = new StringBuilder();
+			builder.append("update");
+			builder.append("  `fcl_rate` rate");
+			builder.append("  join  (");
+			boolean union = false;
+			
+			for (String carrier : carriers) {
+				String field = carrier.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
+				if (union) {
+					builder.append("    union all");
+				}
+				builder.append("    (select");
+				builder.append("      '").append(carrier).append("' as carrier,");
+				builder.append("      group_concat(case when temp.`matrix` = 'Deposit' then temp.`").append(field).append("` else null end) as deposit,");
+				builder.append("      group_concat(case when temp.`matrix` = 'Free Days' then temp.`").append(field).append("` else null end) as free_days");
+				builder.append("    from");
+				builder.append("     `fcl_rate_temp` temp");
+				builder.append("    where temp.`").append(field).append("` is not null");
+				builder.append("      and temp.`matrix` in ('Deposit', 'Free Days')");
+				builder.append("    )");
+				union = true;
+			}
+			builder.append("    ) as temp");
+			builder.append("    on (rate.`carrier` = temp.`carrier`) ");
+			builder.append("set rate.`deposit` = temp.`deposit`,");
+			builder.append("  rate.`free_days` = temp.`free_days`");
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
+
+			for (String carrier : carriers) {
+				builder.setLength(0);
+				String field = carrier.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
+				builder.append("delete");
+				builder.append("  other ");
+				builder.append("from");
+				builder.append("  `fcl_rate` rate");
+				builder.append("  join `fcl_other_rate` other");
+				builder.append("    on (");
+				builder.append("      other.`rate_id` = rate.`id`");
+				builder.append("      and other.`validity_from` = (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity From' limit 1)");
+				builder.append("      and other.`validity_to` = (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity Until' limit 1)");
+				builder.append("    ) ");
+				builder.append("where rate.`carrier` = '").append(carrier).append("'");
+				dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
+			}
+
+			builder.setLength(0);
+			builder.append("insert into `fcl_other_rate` (");
+			builder.append("  `rate_id`,");
+			builder.append("  `drop_off`,");
+			builder.append("  `container_size`,");
+			builder.append("  `charge_code`,");
+			builder.append("  `rate`,");
+			builder.append("  `validity_from`,");
+			builder.append("  `validity_to`");
+			builder.append(") ");
+			union = false;
+			for (String carrier : carriers) {
+				String field = carrier.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
+				if (union) {
+					builder.append(" union all");
+				}
+				builder.append("(select");
+				builder.append("  rate.`id` as rate_id,");
+				builder.append("  substring_index(temp.`matrix`, ' DROPOFF', 1) as drop_off,");
+				builder.append("  substring_index(temp.`matrix`, 'DROPOFF ', -1) as container_size,");
+				builder.append("  'DROPOFF' as charge_code,");
+				builder.append("  temp.`").append(field).append("` as `rate`,");
+				builder.append("  (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity From' limit 1) as validity_from,");
+				builder.append("  (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity Until' limit 1) as validity_to ");
+				builder.append("from");
+				builder.append("  `fcl_rate_temp` temp ");
+				builder.append("  join `fcl_rate` rate");
+				builder.append("    on (rate.`carrier` = '").append(carrier).append("')");
+				builder.append("where temp.`").append(field).append("` is not null");
+				builder.append("  and temp.`matrix` like '%DROPOFF%'");
+				builder.append(")");
+				union = true;
+			}
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
+
+			builder.setLength(0);
+			builder.append("insert into `fcl_other_rate` (");
+			builder.append("  `rate_id`,");
+			builder.append("  `cost_type`,");
+			builder.append("  `charge_code`,");
+			builder.append("  `rate`,");
+			builder.append("  `validity_from`,");
+			builder.append("  `validity_to`");
+			builder.append(") ");
+			union = false;
+			for (String carrier : carriers) {
+				String field = carrier.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
+				for (String costType : costTypes) {
+					if (union) {
+						builder.append(" union all");
+					}
+					builder.append("(select");
+					builder.append("  rate.`id` as rate_id,");
+					builder.append("  '").append(costType).append("' as cost_type,");
+					builder.append("  substring_index(temp.`matrix`, ' ").append(costType).append("', 1) as charge_code,");
+					builder.append("  temp.`").append(field).append("` as `rate`,");
+					builder.append("  (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity From' limit 1) as validity_from,");
+					builder.append("  (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity Until' limit 1) as validity_to ");
+					builder.append("from");
+					builder.append("  `fcl_rate_temp` temp ");
+					builder.append("  join `fcl_rate` rate");
+					builder.append("    on (rate.`carrier` = '").append(carrier).append("')");
+					builder.append("where temp.`").append(field).append("` is not null");
+					builder.append("  and temp.`matrix` like '%").append(costType).append("'");
+					builder.append(")");
+					union = true;
+				}
+			}
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
+		}
 	}
 
-	public void truncateRates(String carrier, Site site) throws SQLException {
-		String query = "delete from `csvrates` where `carrier` = :carrier";
-		MapSqlParameterSource parameterSource = new MapSqlParameterSource();
-		parameterSource.addValue("carrier", carrier, Types.VARCHAR);
-		dynamicRepository.executeUpdate(site.getDbUrl(), site.getDbUser(), site.getDbPassword(), query,
-				parameterSource);
-	}
-
-	public void loadRates(Company company, Site site, File file, InputStream is) throws SQLException {
-		truncateRates(file.getCarrier(), site);
-		String query = company.getLoadingQuery().replace("${fileName}", file.getPath());
-		dynamicRepository.executeUpdate(site.getDbUrl(), site.getDbUser(), site.getDbPassword(), query, is);
-	}
-
-	public void updateRates(File file, Site site) throws SQLException {
-		StringBuilder builder = new StringBuilder();
-		builder.append("update");
-		builder.append("  `csvrates` ");
-		builder.append("set ");
-		builder.append("   `rate_effective_date` = :effectiveDate,");
-		builder.append("   `rate_expiration_date` = :expirationDate,");
-		builder.append("   `surcharge_effective_dt` = :effectiveDate,");
-		builder.append("   `surcharge_expire_dt` = :expirationDate,");
-		builder.append("   `contract_expire`= :expirationDate,");
-		builder.append("   `ship_date` = current_date(),");
-		builder.append("   `surcharge_type` = :surchargeType,");
-		builder.append("   `surcharge_currency` = :surchargeCurrency,");
-		builder.append("   `rate_basis` = :rateBasis ");
-		builder.append("where `carrier` = :carrier");
-		MapSqlParameterSource parameterSource = new MapSqlParameterSource();
-		parameterSource.addValue("effectiveDate", DateUtils.formatToString(file.getEffectiveDate(), "yyyy-MM-dd"),
-				Types.VARCHAR);
-		parameterSource.addValue("expirationDate", DateUtils.formatToString(file.getExpirationDate(), "yyyy-MM-dd"),
-				Types.VARCHAR);
-		parameterSource.addValue("surchargeType", file.getSurchargeType(), Types.VARCHAR);
-		parameterSource.addValue("surchargeCurrency", file.getSurchargeCurrency(), Types.VARCHAR);
-		parameterSource.addValue("rateBasis", file.getRateBasis(), Types.VARCHAR);
-		parameterSource.addValue("carrier", file.getCarrier(), Types.VARCHAR);
-		dynamicRepository.executeUpdate(site.getDbUrl(), site.getDbUser(), site.getDbPassword(), builder.toString(),
-				parameterSource);
-	}
-
-	public void insertOceanFreight(String carrier, Site site) {
-		StringBuilder builder = new StringBuilder();
-		builder.append(
-				"insert into `csvrates` (`quote_id`, `rate_id`, `contract_id`, `amendment_id`, `rate_effective_date`, `rate_expiration_date`, `origin_trade`, `origin_city`, `origin_country`, `origin_code`, `origin_via_city`, `destination_trade`, `destination_city`, `destination_country`, `destination_code`, `destination_via_city`, `carrier`, `price`, `service`, `contract_expire`, `currency`, `currency_rate`, `shipment_size`, `shipment_type`, `commodity_brief`, `commodity_code`, `commodity_exclusions`, `commodity_full`, `hazardous_charge`, `transit`, `contract_notes`, `customer`, `scac`, `surcharge_line_rate_id`, `surcharge_code`, `surcharge_desc`, `surcharge_price`, `surcharge_type`, `surcharge_currency`, `surcharge_expire_dt`, `surcharge_effective_dt`, `rate_basis`, `ship_date`, `gri_remarks`, `general_remarks`) ");
-		builder.append(
-				"select `quote_id`, `rate_id`, `contract_id`, `amendment_id`, `rate_effective_date`, `rate_expiration_date`, `origin_trade`, `origin_city`, `origin_country`, `origin_code`, `origin_via_city`, `destination_trade`, `destination_city`, `destination_country`, `destination_code`, `destination_via_city`, `carrier`, `price`, `service`, `contract_expire`, `currency`, `currency_rate`, `shipment_size`, `shipment_type`, `commodity_brief`, `commodity_code`, `commodity_exclusions`, `commodity_full`, `hazardous_charge`, `transit`, `contract_notes`, `customer`, `scac`, `surcharge_line_rate_id`, 'OFR', 'OCEAN FREIGHT', `price`, `surcharge_type`, `surcharge_currency`, `surcharge_expire_dt`, `surcharge_effective_dt`, `rate_basis`, `ship_date`, `gri_remarks`, `general_remarks` from `csvrates` where `carrier` = :carrier and `surcharge_code` <> '' group by `origin_code`, `origin_via_city`, `destination_code`, `destination_via_city`, `commodity_brief`, `shipment_size`, `contract_notes`");
-		MapSqlParameterSource parameterSource = new MapSqlParameterSource();
-		parameterSource.addValue("carrier", carrier, Types.VARCHAR);
-		dynamicRepository.executeUpdate(site.getDbUrl(), site.getDbUser(), site.getDbPassword(), builder.toString(),
-				parameterSource);
-	}
-
-	public List<KeyValue> findErrors(String carrier, Site site) throws SQLException {
-		StringBuilder builder = new StringBuilder();
-		builder.append("select");
-		builder.append("  r.`surcharge_code` as col1,");
-		builder.append("  r.`surcharge_desc` as col2 ");
-		builder.append("from");
-		builder.append("  `csvrates` r");
-		builder.append("  left join `generic_code` g");
-		builder.append("    on (g.`code_type_id` = 36 and g.`code` = r.`surcharge_code`) ");
-		builder.append("where r.`carrier` = :carrier");
-		builder.append("  and g.`id` is null ");
-		builder.append("group by r.`surcharge_code`");
-		builder.append("");
-		Map<String, Object> params = new HashMap<>();
-		params.put("carrier", carrier);
-		return dynamicRepository.getOptionResults(site.getDbUrl(), site.getDbUser(), site.getDbPassword(),
-				builder.toString(), params);
-	}
-
-	public Map<String, List<KeyValue>> loadRates(Company company, String carrier, String scac, String effectiveDate,
-			String expirationDate, String surchargeType, String surchargeCurrency, String siteIds,
-			MultipartFile sourceFile) throws IllegalStateException, IOException, ParseException, SQLException {
-		List<Long> ids = Stream.of(siteIds.split(",")).map(s -> Long.parseLong(s.trim())).collect(Collectors.toList());
-		List<Site> sites = siteRepository.findAllById(ids);
-		java.io.File directory = new java.io.File(uploadPath + "/" + company.getName().replaceAll("[^a-zA-Z0-9]", "_"));
+	public Map<String, List<KeyValue>> loadRates(Company company, Rates rates) throws Exception {
+		List<Long> ids = Stream.of(rates.getPartnerIds().split(",")).map(s -> Long.parseLong(s.trim())).collect(Collectors.toList());
+		List<Company> partners = companyRepository.findAllById(ids);
+		java.io.File directory = new java.io.File(uploadLocation + "/" + company.getName().replaceAll("[^a-zA-Z0-9]", "_"));
 		if (!directory.exists()) {
 			directory.mkdirs();
 		}
+		MultipartFile sourceFile = rates.getFile();
 		String filename = FilenameUtils.getBaseName(sourceFile.getOriginalFilename()).replaceAll("[^a-zA-Z0-9]", "_");
 		String extension = FilenameUtils.getExtension(sourceFile.getOriginalFilename());
-		java.io.File targetFile = new java.io.File(directory,
-				filename + "_" + System.currentTimeMillis() + "." + extension);
+		java.io.File targetFile = new java.io.File(directory, filename + "_" + System.currentTimeMillis() + "." + extension);
 		sourceFile.transferTo(targetFile);
-
-		insertLocalTable(targetFile);
-		String generateCsvpath = "E:/share/documents/TRANSBORDER/FCL/RATES/csvrates_" + System.currentTimeMillis()
-				+ ".csv";
-		getLocalTableRates(generateCsvpath);
-		String deleteCsvRates = this.getDeleteCsvRates();
-		System.out.println(deleteCsvRates);
-
-		java.io.File loadFile = new java.io.File(generateCsvpath);
-
 		File file = new File();
 		file.setName(sourceFile.getOriginalFilename());
-		// System.out.println(effectiveDate + " == " +
-		// DateUtils.parseToDate(effectiveDate, "MM/dd/yyyy"));
-		file.setCarrier("Tes");
-		file.setScac("dsa");
-		file.setEffectiveDate(DateUtils.parseToDate("05/07/2019", "MM/dd/yyyy"));
-		file.setExpirationDate(DateUtils.parseToDate("05/07/2019", "MM/dd/yyyy"));
-		file.setSurchargeType("R");
-		file.setSurchargeCurrency("USD");
-		file.setRateBasis("PC");
-		file.setPath(loadFile.getAbsolutePath().replaceAll("\\\\", "/"));
+		file.setPath(targetFile.getAbsolutePath().replaceAll("\\\\", "/"));
 		file.setCompany(company);
+		file.setShipmentType(rates.getShipmentType());
+		file.setRatesType(rates.getRateType());
 		file.setLoadedDate(new Date());
 		fileRepository.save(file);
-		InputStream is = FileUtils.openInputStream(targetFile);
 		Map<String, List<KeyValue>> errors = new HashMap<>();
-		for (Site site : sites) {
-			this.deleteCsvRates(deleteCsvRates, site);
-			this.loadRates(site, loadFile);
-			SiteFile siteFile = new SiteFile();
-			siteFile.setFile(file);
-			siteFile.setSite(site);
-			siteFileRepository.save(siteFile);
-//			List<KeyValue> error = findErrors(file.getCarrier(), site);
+		java.io.File csvFile;
+		if (FilenameUtils.isExtension(file.getName(), new String[] { "xls", "xlsx" })) {
+			csvFile = xls2csv(targetFile);
+		} else {
+			csvFile = targetFile;
+		}
+		for (Company partner : partners) {
+			History history = new History();
+			history.setFile(file);
+			history.setCompany(partner);
+			historyRepository.save(history);
+			if (StringUtils.isEqual(rates.getRateType(), "F")) {
+				loadFclFreightRates(partner, csvFile);
+			} else {
+				loadFclOtherRates(partner, csvFile);
+			}
+//			List<KeyValue> error = findErrors(file.getCarrier(), company);
 //			if (error != null && !error.isEmpty()) {
-//				errors.put(site.getName(), error);
+//				errors.put(company.getName(), error);
 //			}
 		}
 		return errors;
-	}
-
-	public List<ResultModel> searchRates(Company company, String carrier, String fromDate, String toDate)
-			throws ParseException {
-		return customRepository.findFilesByCarrierOrLoadedDate(company, carrier, fromDate, toDate);
-	}
-
-	public void loadRates(Site site, java.io.File file) throws SQLException {
-		String query = "LOAD DATA LOCAL INFILE '" + file.getAbsolutePath().replaceAll("\\\\", "/")
-				+ "' INTO TABLE csvrates FIELDS TERMINATED BY ',' ENCLOSED BY '\"' LINES TERMINATED BY '\r\n'  "
-				+ "(QUOTE_ID,CONTRACT_ID,RATE_EFFECTIVE_DATE,RATE_EXPIRATION_DATE,"
-				+ "ORIGIN_CITY,ORIGIN_COUNTRY,ORIGIN_CODE,ORIGIN_VIA_CITY,DESTINATION_CITY,DESTINATION_COUNTRY,DESTINATION_CODE,"
-				+ "DESTINATION_VIA_CITY,carrier,PRICE,CURRENCY,SHIPMENT_SIZE,SHIPMENT_TYPE,TRANSIT,COMMODITY_FULL,SCAC,"
-				+ "SURCHARGE_CODE,SURCHARGE_DESC,SURCHARGE_PRICE,SURCHARGE_CURRENCY,SURCHARGE_EFFECTIVE_DT,"
-				+ "SURCHARGE_EXPIRE_DT,RATE_BASIS)";
-		dynamicRepository.executeUpdate(site.getDbUrl(), site.getDbUser(), site.getDbPassword(), query);
-	}
-
-	public void insertLocalTable(java.io.File file) throws SQLException {
-		String queryStr = "TRUNCATE TABLE fcl_freight_rate";
-		dynamicRepository.executeUpdate(dbUrl, dbUser, dbPassword, queryStr);
-		String query = "LOAD DATA LOCAL INFILE '" + file.getAbsolutePath().replaceAll("\\\\", "/")
-				+ "' INTO TABLE fcl_freight_rate FIELDS TERMINATED BY ',' ENCLOSED BY '\"' LINES TERMINATED BY '\r\n' IGNORE 1 LINES "
-				+ "(direction,overseas_agent,origin_country,origin,pol,destination_country,pod,"
-				+ "destination,carrier,shipping_code,naviera_group,bill_policy_ship_line,type_of_rate,contract_number,"
-				+ "contract_closed_by,currency,20_ofr_std,20_baf_std,20_isps_std,20_pre_std,20_ott_std,"
-				+ "20_total_std,40_ofr_std,40_baf_std,40_isps_std,40_pre_std,40_ott_std,40_total_std,40hc_ofr_std,"
-				+ "40hc_baf_std,40hc_isps_std,40hc_pre_std,40hc_ott_std,40hc_total_std,40nor_ofr_std,40nor_baf_std,"
-				+ "40nor_isps_std,40nor_pre_std,40nor_ott_std,40nor_total_std,transit_time,frequency,route,comments,"
-				+ "validity_from,validity_until,scac_code,pol_code,pod_code)";
-		dynamicRepository.executeUpdate(dbUrl, dbUser, dbPassword, query);
-	}
-
-	public void getLocalTableRates(String path) {
-		String queryStr = this.queryBuilder(path);
-		dynamicRepository.executeUpdate(dbUrl, dbUser, dbPassword, queryStr);
-	}
-
-	private String queryBuilder(String path) {
-
-		List<String> queryList = new ArrayList<String>();
-		queryList.add("20$FCL - 20 / DC$OCNF$Ocean Freight$20_ofr_std$20_total_std");
-		queryList.add("20$FCL - 20 / DC$BAF$BUNKER ADJUSTMENT FACTOR$20_baf_std$20_total_std");
-		queryList.add("20$FCL - 20 / DC$ISPS$PORT SECURITY$20_isps_std$20_total_std");
-		queryList.add("20$FCL - 20 / DC$PRE$PRECARRIAGE$20_pre_std$20_total_std");
-		queryList.add("20$FCL - 20 / DC$OTT$OTHER$20_ott_std$20_total_std");
-
-		StringBuilder queryStr = new StringBuilder();
-		queryStr.append("select *from( ");
-		for (String q : queryList) {
-			String ele[] = q.split("\\$");
-			queryStr.append(" (select concat(carrier,'-',pol_code,'-',pod_code,'-").append(ele[0])
-					.append("','-',replace(STR_TO_DATE(validity_until,'%Y/%m/%d'),'-','')) as quote_id, ");
-			queryStr.append(
-					"contract_number,STR_TO_DATE(validity_from, '%d/%m/%Y') as rateEffDate,STR_TO_DATE(validity_until, '%d/%m/%Y') as rateExpDate, ");
-			queryStr.append("if(origin <> '',origin,pol) as origin,origin_country,pol_code,  ");
-			queryStr.append("if(origin <> '',pol,'') as originVia,  ");
-			queryStr.append("if(destination <> '',destination,pod) as destination,destination_country,pod_code, ");
-			queryStr.append("if(destination <> '',pod,'') as destVia,carrier,  ");
-			queryStr.append(ele[5]).append(" as price,currency, ");
-			queryStr.append("'").append(ele[0]).append("' as shipmentSize,");
-			queryStr.append("'").append(ele[1]).append("'  as shipmentType, ");
-			queryStr.append("transit_time as transitTime, type_of_rate as commdity,scac_code, ");
-			queryStr.append("'").append(ele[2]).append("' as surchargeCode,");
-			queryStr.append("'").append(ele[3]).append("' as surchargeDesc, ");
-			queryStr.append(ele[4]).append(" as surchargePrice,currency as surchargeCurrency, ");
-			queryStr.append(
-					"STR_TO_DATE(validity_from, '%d/%m/%Y') as surEffDate,STR_TO_DATE(validity_until, '%d/%m/%Y') as surExpDate, ");
-			queryStr.append("'PC' as rateBasis from fcl_freight_rate where ");
-			queryStr.append(ele[4]).append(" <> 0 and ").append(ele[5]).append(" <> 0 ) UNION ALL");
-		}
-		queryStr = new StringBuilder(queryStr.toString().substring(0, queryStr.toString().length() - 10));
-		queryStr.append(" ) as t  INTO OUTFILE '").append(path);
-		queryStr.append(
-				"' FIELDS ENCLOSED BY '\\\"' TERMINATED BY ',' ESCAPED BY '\\\"' LINES TERMINATED BY '\\r\\n' ");
-
-		return queryStr.toString();
-	}
-
-	public String getDeleteCsvRates() {
-		String queryStr = this.getDeleteQuoteIdQuery();
-		return dynamicRepository.getSingleValueQuery(dbUrl, dbUser, dbPassword, queryStr);
-	}
-
-	private String getDeleteQuoteIdQuery() {
-		List<String> queryList = new ArrayList<String>();
-		queryList.add("20");
-		queryList.add("40");
-		queryList.add("40HC");
-		queryList.add("40NOR");
-		StringBuilder queryStr = new StringBuilder();
-		queryStr.append("select concat(\"'\",group_concat(t.quoteId separator \"','\"),\"'\") as quoteId from ( ");
-		for (String q : queryList) {
-			queryStr.append(" (select concat(carrier,'-',pol_code,'-',pod_code,'-").append(q);
-			queryStr.append("','-',replace(STR_TO_DATE(validity_until,'%Y/%m/%d'),'-','')) as quoteId ");
-			queryStr.append(" from fcl_freight_rate  group by carrier)  UNION ALL");
-		}
-
-		queryStr = new StringBuilder(queryStr.toString().substring(0, queryStr.toString().length() - 10));
-		queryStr.append(" ) as t ");
-		return queryStr.toString();
-	}
-
-	public void deleteCsvRates(String deleteValues, Site site) {
-		String queryStr = "delete from csvrates where QUOTE_ID IN(" + deleteValues + ")";
-		int count = dynamicRepository.executeUpdateWithoutParam(site.getDbUrl(), site.getDbUser(), site.getDbPassword(),
-				queryStr);
-		System.out.println("Count---" + count);
 	}
 
 }

@@ -17,7 +17,6 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import com.logiware.edi.entity.Company;
 import com.logiware.rates.datasource.DataSourceManager;
 import com.logiware.rates.dto.KeyValue;
 import com.mysql.cj.jdbc.StatementImpl;
@@ -70,7 +69,7 @@ public class DynamicRepository {
 		return jdbcTemplate.update(query, parameterSource);
 	}
 
-	public Integer executeUpdate(String dbUrl, String dbUser, String dbPassword, String query, InputStream is)
+	public Integer loadLocalInfile(String dbUrl, String dbUser, String dbPassword, String query, InputStream is)
 			throws SQLException {
 		if (!dbUrl.contains("allowLoadLocalInfile")) {
 			dbUrl += (dbUrl.contains("?") ? "" : "?") + "allowLoadLocalInfile=true";
@@ -84,10 +83,16 @@ public class DynamicRepository {
 		return count;
 	}
 
-	public void executeUpdate(String dbUrl, String dbUser, String dbPassword, String query) {
+	public void loadLocalInfile(String dbUrl, String dbUser, String dbPassword, String query) {
 		if (!dbUrl.contains("allowLoadLocalInfile")) {
 			dbUrl += (dbUrl.contains("?") ? "" : "?") + "allowLoadLocalInfile=true";
 		}
+		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
+		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+		jdbcTemplate.execute(query);
+	}
+
+	public void executeUpdate(String dbUrl, String dbUser, String dbPassword, String query) {
 		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
 		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 		jdbcTemplate.execute(query);

@@ -2,7 +2,7 @@ package com.logiware.rates.util;
 
 import java.util.Arrays;
 
-public class StringUtils {
+public class StringUtils extends org.apache.commons.lang3.StringUtils{
 
 	public static boolean isEmpty(String str) {
 		return str == null || str.trim().isEmpty();
@@ -53,6 +53,10 @@ public class StringUtils {
 	
 	public static boolean isEqual(String str1, String str2) {
 		return str1 != null && str2 != null ? str1.trim().toLowerCase().equalsIgnoreCase(str2.trim().toLowerCase()) : false;
+	}
+	
+	public static boolean isNotEqual(String str1, String str2) {
+		return !isEqual(str1, str2);
 	}
 
 	public static boolean in(String str, String... strs) {

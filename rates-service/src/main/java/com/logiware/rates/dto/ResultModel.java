@@ -12,13 +12,10 @@ import lombok.Setter;
 @Setter(value = AccessLevel.PUBLIC)
 public class ResultModel {
 
-	private String carrier;
-	private String scac;
-	private String effectiveDate;
-	private String expirationDate;
 	private String filename;
 	private String loadedDate;
 	private String sites;
+	private String errors;
 	private Long id;
 	
 }

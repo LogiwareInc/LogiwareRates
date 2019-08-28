@@ -18,8 +18,8 @@ import org.springframework.stereotype.Service;
 import com.logiware.rates.dto.ResultModel;
 import com.logiware.rates.entity.Company;
 import com.logiware.rates.entity.File;
-import com.logiware.rates.entity.Site;
-import com.logiware.rates.entity.SiteFile;
+import com.logiware.rates.entity.Partner;
+import com.logiware.rates.entity.History;
 import com.logiware.rates.util.DateUtils;
 import com.logiware.rates.util.StringUtils;
 
@@ -65,13 +65,9 @@ public class CustomRepository {
 		List<ResultModel> results = new ArrayList<>();
 		files.forEach(file -> {
 			ResultModel result = new ResultModel();
-			result.setCarrier(file.getCarrier());
-			result.setScac(file.getScac());
-			result.setEffectiveDate(DateUtils.formatToString(file.getEffectiveDate(), "MM/dd/yyyy"));
-			result.setExpirationDate(DateUtils.formatToString(file.getExpirationDate(), "MM/dd/yyyy"));
 			result.setFilename(file.getName());
 			result.setLoadedDate(DateUtils.formatToString(file.getLoadedDate(), "MM/dd/yyyy hh:mm a"));
-			result.setSites(file.getSiteFiles().stream().map(SiteFile::getSite).map(Site::getName).collect(Collectors.joining(",")));
+			result.setSites(file.getHistories().stream().map(History::getCompany).map(Company::getName).collect(Collectors.joining(",")));
 			result.setId(file.getId());
 			results.add(result);
 		});

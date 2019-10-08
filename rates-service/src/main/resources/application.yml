@@ -1,18 +1,67 @@
-server:
-  port: 9002
-spring:  
- profiles: dev
- datasource:
+#'development' profile only
+spring:   
+ profiles: dev 
+ datasource: 
     url: jdbc:mysql://localhost:3306/logiware_rates
     username: root
     password: L0g!w@r3
- jpa:
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
-        show_sql: false
-        format_sql: true
-        id:
+    hikari:
+      connectionTimeout: 30000
+      idleTimeout: 300000
+      maxLifetime: 900000
+      maximumPoolSize: 5
+      minimumIdle: 1
+ jpa: 
+    properties: 
+      hibernate: 
+        dialect: org.hibernate.dialect.MySQLDialect 
+        show_sql: false 
+        format_sql: true 
+        id: 
+          new_generator_mappings: false 
+
+#'stage' profile only
+---  
+spring:   
+ profiles: stg 
+ datasource: 
+    url: jdbc:mysql://35.200.181.132:3306/logiware_rates 
+    username: root 
+    password: Password123
+    hikari:
+      connectionTimeout: 30000
+      idleTimeout: 300000
+      maxLifetime: 900000
+      maximumPoolSize: 5
+      minimumIdle: 1 
+ jpa: 
+    properties: 
+      hibernate: 
+        dialect: org.hibernate.dialect.MySQLDialect 
+        show_sql: false 
+        format_sql: true 
+        id: 
           new_generator_mappings: false
- spring:  
-  profiles: prd
+
+#'production' profile only   
+---  
+spring:   
+ profiles: prd 
+ datasource: 
+    url: jdbc:mysql://35.196.165.140:3306/logiware_rates 
+    username: logiware 
+    password: j6qP97t1G68l36Y     
+    hikari:
+      connectionTimeout: 30000
+      idleTimeout: 300000
+      maxLifetime: 900000
+      maximumPoolSize: 5
+      minimumIdle: 1 
+ jpa: 
+    properties: 
+      hibernate: 
+        dialect: org.hibernate.dialect.MySQLDialect 
+        show_sql: false 
+        format_sql: true 
+        id: 
+          new_generator_mappings: false

@@ -1,3 +1,5 @@
+server:
+  port: 9002
 #'development' profile only
 spring:   
  profiles: dev 

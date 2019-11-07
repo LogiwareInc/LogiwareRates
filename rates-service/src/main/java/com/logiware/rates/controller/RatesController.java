@@ -92,7 +92,7 @@ public class RatesController {
 	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates are loaded Successfully", response = Map.class),
 			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
 	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
-	public @ResponseBody ResponseEntity<?> sendDocument(@ModelAttribute Rates rates, HttpServletRequest req) {
+	public @ResponseBody ResponseEntity<?> loadRates(@ModelAttribute Rates rates, HttpServletRequest req) {
 		try {
 			Company company = companyService.whoami(req);
 			if (company == null) {
@@ -110,5 +110,52 @@ public class RatesController {
 			return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
 		}
 	}
-	
+
+	@PostMapping(value = "/find")
+	@ApiOperation(value = "Find Rates")
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates are loaded Successfully", response = Map.class),
+			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
+	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
+	public @ResponseBody ResponseEntity<?> findRates(@ModelAttribute Rates rates, HttpServletRequest req) {
+		try {
+			Company company = companyService.whoami(req);
+			if (company == null) {
+				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
+			}
+			Map<String, List<KeyValue>> errors = ratesService.loadRates(company, rates);
+			Map<String, Object> response = new HashMap<>();
+			response.put("message", "Rates are loaded successfully");
+			if (!errors.isEmpty()) {
+				response.put("errors", errors);
+			}
+			return ResponseEntity.ok().body(response);
+		} catch (Exception e) {
+			e.printStackTrace();
+			return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
+		}
+	}	
+
+	@PostMapping(value = "/download")
+	@ApiOperation(value = "Download Rates")
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates are loaded Successfully", response = Map.class),
+			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
+	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
+	public @ResponseBody ResponseEntity<?> downloadRates(@ModelAttribute Rates rates, HttpServletRequest req) {
+		try {
+			Company company = companyService.whoami(req);
+			if (company == null) {
+				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
+			}
+			Map<String, List<KeyValue>> errors = ratesService.loadRates(company, rates);
+			Map<String, Object> response = new HashMap<>();
+			response.put("message", "Rates are loaded successfully");
+			if (!errors.isEmpty()) {
+				response.put("errors", errors);
+			}
+			return ResponseEntity.ok().body(response);
+		} catch (Exception e) {
+			e.printStackTrace();
+			return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
+		}
+	}	
 }

@@ -71,27 +71,14 @@ public class RatesService {
 			Cell cell;
 			List<String[]> lines = new ArrayList<>();
 			FormulaEvaluator evaluator = wb.getCreationHelper().createFormulaEvaluator();
-
 			for (int rowIndex = 0; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
 				row = sheet.getRow(rowIndex);
-				String[] line = new String[row.getLastCellNum()];
-				for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
-					cell = row.getCell(cellIndex);
-					if (null != cell) {
-						switch (cell.getCellType()) {
-						case BOOLEAN:
-							line[cellIndex] = "" + cell.getBooleanCellValue();
-							break;
-						case NUMERIC:
-							if (HSSFDateUtil.isCellDateFormatted(cell)) {
-								line[cellIndex] = DateUtils.formatToString(cell.getDateCellValue(), "MM/dd/yyyy");
-							} else {
-								line[cellIndex] = "" + cell.getNumericCellValue();
-							}
-							break;
-						case FORMULA:
-							CellType cellType = evaluator.evaluateFormulaCell(cell);
-							switch (cellType) {
+				if (row != null) {
+					String[] line = new String[row.getLastCellNum()];
+					for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
+						cell = row.getCell(cellIndex);
+						if (null != cell) {
+							switch (cell.getCellType()) {
 							case BOOLEAN:
 								line[cellIndex] = "" + cell.getBooleanCellValue();
 								break;
@@ -102,6 +89,27 @@ public class RatesService {
 									line[cellIndex] = "" + cell.getNumericCellValue();
 								}
 								break;
+							case FORMULA:
+								CellType cellType = evaluator.evaluateFormulaCell(cell);
+								switch (cellType) {
+								case BOOLEAN:
+									line[cellIndex] = "" + cell.getBooleanCellValue();
+									break;
+								case NUMERIC:
+									if (HSSFDateUtil.isCellDateFormatted(cell)) {
+										line[cellIndex] = DateUtils.formatToString(cell.getDateCellValue(), "MM/dd/yyyy");
+									} else {
+										line[cellIndex] = "" + cell.getNumericCellValue();
+									}
+									break;
+								case BLANK:
+									line[cellIndex] = "";
+									break;
+								default:
+									line[cellIndex] = cell.getStringCellValue();
+									break;
+								}
+								break;
 							case BLANK:
 								line[cellIndex] = "";
 								break;
@@ -109,19 +117,12 @@ public class RatesService {
 								line[cellIndex] = cell.getStringCellValue();
 								break;
 							}
-							break;
-						case BLANK:
+						} else {
 							line[cellIndex] = "";
-							break;
-						default:
-							line[cellIndex] = cell.getStringCellValue();
-							break;
 						}
-					} else {
-						line[cellIndex] = "";
 					}
+					lines.add(line);
 				}
-				lines.add(line);
 			}
 			cw.writeAll(lines);
 		}
@@ -186,13 +187,15 @@ public class RatesService {
 			builder.append("  `carrier`,");
 			builder.append("  `scac`,");
 			builder.append("  `contract_number`,");
-			builder.append("  `type_of_rate`");
+			builder.append("  `type_of_rate`,");
+			builder.append("  `entered_date`");
 			builder.append(") ");
 			builder.append("select");
 			builder.append("  temp.`carrier`,");
 			builder.append("  temp.`scac_code`,");
 			builder.append("  temp.`contract_number`,");
-			builder.append("  temp.`type_of_rate` ");
+			builder.append("  temp.`type_of_rate`,");
+			builder.append("  now() as entered_date ");
 			builder.append("from");
 			builder.append("  `fcl_rate_temp` temp ");
 			builder.append("where temp.`carrier` <> '' ");
@@ -244,7 +247,8 @@ public class RatesService {
 			builder.append("  `shipping_code`,");
 			builder.append("  `naviera_group`,");
 			builder.append("  `bill_policy`,");
-			builder.append("  `contract_closed_by`");
+			builder.append("  `contract_closed_by`,");
+			builder.append("  `entered_date`");
 			builder.append(") ");
 			builder.append("select");
 			builder.append("  rate.`id` as `rate_id`,");
@@ -268,7 +272,8 @@ public class RatesService {
 			builder.append("  temp.`shipping_code`,");
 			builder.append("  temp.`naviera_group`,");
 			builder.append("  temp.`bill_policy_shipping_line`,");
-			builder.append("  temp.`contract_closed_by` ");
+			builder.append("  temp.`contract_closed_by`,");
+			builder.append("  now() as entered_date ");
 			builder.append("from");
 			builder.append("  `fcl_rate_temp` temp");
 			builder.append("  join `fcl_rate` rate");
@@ -286,7 +291,8 @@ public class RatesService {
 			builder.append("  `route_id`,");
 			builder.append("  `container_size`,");
 			builder.append("  `charge_code`,");
-			builder.append("  `rate`");
+			builder.append("  `rate`,");
+			builder.append("  `entered_date`");
 			builder.append(") ");
 			boolean union = false;
 			for (String containerSize : freightRates.keySet()) {
@@ -299,7 +305,8 @@ public class RatesService {
 					builder.append("  route.`id` as `route_id`,");
 					builder.append("  '").append(containerSize).append("' as `container_size`,");
 					builder.append("  '").append(chargeCode).append("' as `charge_code`,");
-					builder.append("  temp.`").append(rateField).append("` ");
+					builder.append("  temp.`").append(rateField).append("`,");
+					builder.append("  now() as entered_date ");
 					builder.append("from");
 					builder.append("  `fcl_rate_temp` temp");
 					builder.append("  join `fcl_rate` rate");
@@ -372,7 +379,7 @@ public class RatesService {
 			builder.append("  `fcl_rate` rate");
 			builder.append("  join  (");
 			boolean union = false;
-			
+
 			for (String carrier : carriers) {
 				String field = carrier.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
 				if (union) {
@@ -405,8 +412,10 @@ public class RatesService {
 				builder.append("  join `fcl_other_rate` other");
 				builder.append("    on (");
 				builder.append("      other.`rate_id` = rate.`id`");
-				builder.append("      and other.`validity_from` = (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity From' limit 1)");
-				builder.append("      and other.`validity_to` = (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity Until' limit 1)");
+				builder.append("      and other.`validity_from` = (select str_to_date(validity.`").append(field)
+						.append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity From' limit 1)");
+				builder.append("      and other.`validity_to` = (select str_to_date(validity.`").append(field)
+						.append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity Until' limit 1)");
 				builder.append("    ) ");
 				builder.append("where rate.`carrier` = '").append(carrier).append("'");
 				dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
@@ -420,7 +429,8 @@ public class RatesService {
 			builder.append("  `charge_code`,");
 			builder.append("  `rate`,");
 			builder.append("  `validity_from`,");
-			builder.append("  `validity_to`");
+			builder.append("  `validity_to`,");
+			builder.append("  `entered_date`");
 			builder.append(") ");
 			union = false;
 			for (String carrier : carriers) {
@@ -434,8 +444,11 @@ public class RatesService {
 				builder.append("  substring_index(temp.`matrix`, 'DROPOFF ', -1) as container_size,");
 				builder.append("  'DROPOFF' as charge_code,");
 				builder.append("  temp.`").append(field).append("` as `rate`,");
-				builder.append("  (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity From' limit 1) as validity_from,");
-				builder.append("  (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity Until' limit 1) as validity_to ");
+				builder.append("  (select str_to_date(validity.`").append(field)
+						.append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity From' limit 1) as validity_from,");
+				builder.append("  (select str_to_date(validity.`").append(field)
+						.append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity Until' limit 1) as validity_to,");
+				builder.append("  now() as entered_date ");
 				builder.append("from");
 				builder.append("  `fcl_rate_temp` temp ");
 				builder.append("  join `fcl_rate` rate");
@@ -454,7 +467,8 @@ public class RatesService {
 			builder.append("  `charge_code`,");
 			builder.append("  `rate`,");
 			builder.append("  `validity_from`,");
-			builder.append("  `validity_to`");
+			builder.append("  `validity_to`,");
+			builder.append("  `entered_date`");
 			builder.append(") ");
 			union = false;
 			for (String carrier : carriers) {
@@ -468,8 +482,12 @@ public class RatesService {
 					builder.append("  '").append(costType).append("' as cost_type,");
 					builder.append("  substring_index(temp.`matrix`, ' ").append(costType).append("', 1) as charge_code,");
 					builder.append("  temp.`").append(field).append("` as `rate`,");
-					builder.append("  (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity From' limit 1) as validity_from,");
-					builder.append("  (select str_to_date(validity.`").append(field).append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity Until' limit 1) as validity_to ");
+					builder.append("  (select str_to_date(validity.`").append(field)
+							.append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity From' limit 1) as validity_from,");
+					builder.append("  (select str_to_date(validity.`").append(field)
+							.append("`, '%m/%d/%Y') from `fcl_rate_temp` validity where validity.`matrix` = 'Validity Until' limit 1) as validity_to,");
+					;
+					builder.append("  now() as entered_date ");
 					builder.append("from");
 					builder.append("  `fcl_rate_temp` temp ");
 					builder.append("  join `fcl_rate` rate");

@@ -5,6 +5,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -16,11 +17,13 @@ import java.util.stream.Stream;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.poi.hssf.usermodel.HSSFDateUtil;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.hssf.usermodel.HSSFCell;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
-import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,8 +31,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.logiware.rates.dto.KeyValue;
-import com.logiware.rates.dto.Rates;
+import com.logiware.rates.dto.FileDTO;
+import com.logiware.rates.dto.KeyValueDTO;
+import com.logiware.rates.dto.RatesDTO;
 import com.logiware.rates.entity.Company;
 import com.logiware.rates.entity.File;
 import com.logiware.rates.entity.History;
@@ -38,6 +42,7 @@ import com.logiware.rates.repository.DynamicRepository;
 import com.logiware.rates.repository.FileRepository;
 import com.logiware.rates.repository.HistoryRepository;
 import com.logiware.rates.util.DateUtils;
+import com.logiware.rates.util.ExcelUtils;
 import com.logiware.rates.util.StringUtils;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
@@ -60,15 +65,19 @@ public class RatesService {
 	@Autowired
 	private HistoryRepository historyRepository;
 
-	private java.io.File xls2csv(java.io.File xlsFile) throws Exception {
+	private static final char SEPARATOR = ',';
+	private static final char QUOTE_CHARACTER = '"';
+	private static final char ESCAPE_CHARACTER = '"';
+	private static final String LINE_END = "\r\n";
+
+	private java.io.File xls2csv(java.io.File xlsFile) throws IOException {
 		String path = xlsFile.getPath();
 		java.io.File csvFile = new java.io.File(FilenameUtils.getFullPath(path) + FilenameUtils.getName(path).replace(".xlsx", ".csv"));
-		try (XSSFWorkbook wb = new XSSFWorkbook(FileUtils.openInputStream(xlsFile));
-				CSVWriter cw = new CSVWriter(new FileWriter(csvFile), CSVWriter.DEFAULT_SEPARATOR, CSVWriter.DEFAULT_QUOTE_CHARACTER, CSVWriter.DEFAULT_ESCAPE_CHARACTER,
-						CSVWriter.RFC4180_LINE_END);) {
-			XSSFSheet sheet = wb.getSheetAt(0);
-			Row row;
-			Cell cell;
+		try (HSSFWorkbook wb = new HSSFWorkbook(FileUtils.openInputStream(xlsFile));
+				CSVWriter cw = new CSVWriter(new FileWriter(csvFile), SEPARATOR, QUOTE_CHARACTER, ESCAPE_CHARACTER, LINE_END);) {
+			HSSFSheet sheet = wb.getSheetAt(0);
+			HSSFRow row;
+			HSSFCell cell;
 			List<String[]> lines = new ArrayList<>();
 			FormulaEvaluator evaluator = wb.getCreationHelper().createFormulaEvaluator();
 			for (int rowIndex = 0; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
@@ -78,45 +87,37 @@ public class RatesService {
 					for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
 						cell = row.getCell(cellIndex);
 						if (null != cell) {
-							switch (cell.getCellType()) {
-							case BOOLEAN:
-								line[cellIndex] = "" + cell.getBooleanCellValue();
-								break;
-							case NUMERIC:
-								if (HSSFDateUtil.isCellDateFormatted(cell)) {
-									line[cellIndex] = DateUtils.formatToString(cell.getDateCellValue(), "MM/dd/yyyy");
-								} else {
-									line[cellIndex] = "" + cell.getNumericCellValue();
-								}
-								break;
-							case FORMULA:
-								CellType cellType = evaluator.evaluateFormulaCell(cell);
-								switch (cellType) {
-								case BOOLEAN:
-									line[cellIndex] = "" + cell.getBooleanCellValue();
-									break;
-								case NUMERIC:
-									if (HSSFDateUtil.isCellDateFormatted(cell)) {
-										line[cellIndex] = DateUtils.formatToString(cell.getDateCellValue(), "MM/dd/yyyy");
-									} else {
-										line[cellIndex] = "" + cell.getNumericCellValue();
-									}
-									break;
-								case BLANK:
-									line[cellIndex] = "";
-									break;
-								default:
-									line[cellIndex] = cell.getStringCellValue();
-									break;
-								}
-								break;
-							case BLANK:
-								line[cellIndex] = "";
-								break;
-							default:
-								line[cellIndex] = cell.getStringCellValue();
-								break;
-							}
+							line[cellIndex] = ExcelUtils.getCellValue(cell, evaluator, "MM/dd/yyyy");
+						} else {
+							line[cellIndex] = "";
+						}
+					}
+					lines.add(line);
+				}
+			}
+			cw.writeAll(lines);
+		}
+		return csvFile;
+	}
+
+	private java.io.File xlsx2csv(java.io.File xlsFile) throws IOException {
+		String path = xlsFile.getPath();
+		java.io.File csvFile = new java.io.File(FilenameUtils.getFullPath(path) + FilenameUtils.getName(path).replace(".xlsx", ".csv"));
+		try (XSSFWorkbook wb = new XSSFWorkbook(FileUtils.openInputStream(xlsFile));
+				CSVWriter cw = new CSVWriter(new FileWriter(csvFile), SEPARATOR, QUOTE_CHARACTER, ESCAPE_CHARACTER, LINE_END);) {
+			XSSFSheet sheet = wb.getSheetAt(0);
+			XSSFRow row;
+			XSSFCell cell;
+			List<String[]> lines = new ArrayList<>();
+			FormulaEvaluator evaluator = wb.getCreationHelper().createFormulaEvaluator();
+			for (int rowIndex = 0; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+				row = sheet.getRow(rowIndex);
+				if (row != null && row.getLastCellNum() > 0) {
+					String[] line = new String[row.getLastCellNum()];
+					for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
+						cell = row.getCell(cellIndex);
+						if (null != cell) {
+							line[cellIndex] = ExcelUtils.getCellValue(cell, evaluator, "MM/dd/yyyy");
 						} else {
 							line[cellIndex] = "";
 						}
@@ -502,7 +503,7 @@ public class RatesService {
 		}
 	}
 
-	public Map<String, List<KeyValue>> loadRates(Company company, Rates rates) throws Exception {
+	public Map<String, List<KeyValueDTO>> loadRates(Company company, RatesDTO rates) throws Exception {
 		List<Long> ids = Stream.of(rates.getPartnerIds().split(",")).map(s -> Long.parseLong(s.trim())).collect(Collectors.toList());
 		List<Company> partners = companyRepository.findAllById(ids);
 		java.io.File directory = new java.io.File(uploadLocation + "/" + company.getName().replaceAll("[^a-zA-Z0-9]", "_"));
@@ -522,10 +523,12 @@ public class RatesService {
 		file.setRatesType(rates.getRateType());
 		file.setLoadedDate(new Date());
 		fileRepository.save(file);
-		Map<String, List<KeyValue>> errors = new HashMap<>();
+		Map<String, List<KeyValueDTO>> errors = new HashMap<>();
 		java.io.File csvFile;
-		if (FilenameUtils.isExtension(file.getName(), new String[] { "xls", "xlsx" })) {
+		if (FilenameUtils.isExtension(file.getName(), "xls")) {
 			csvFile = xls2csv(targetFile);
+		} else if (FilenameUtils.isExtension(file.getName(), "xlsx")) {
+			csvFile = xlsx2csv(targetFile);
 		} else {
 			csvFile = targetFile;
 		}
@@ -539,7 +542,7 @@ public class RatesService {
 			} else {
 				loadFclOtherRates(partner, csvFile);
 			}
-//			List<KeyValue> error = findErrors(file.getCarrier(), company);
+//			List<KeyValueDTO> error = findErrors(file.getCarrier(), company);
 //			if (error != null && !error.isEmpty()) {
 //				errors.put(company.getName(), error);
 //			}
@@ -547,4 +550,15 @@ public class RatesService {
 		return errors;
 	}
 
+	public List<FileDTO> findRates(String loadedDate) throws ParseException {
+		List<File> files;
+		if (StringUtils.isNotEmpty(loadedDate)) {
+			Date start = DateUtils.parseToDate(loadedDate, "MM/dd/yyyy 00:00:00");
+			Date end = DateUtils.parseToDate(loadedDate, "MM/dd/yyyy 23:59:59");
+			files = fileRepository.findByLoadedDateBetween(start, end);
+		} else {
+			files = fileRepository.findAll();
+		}
+		return files.stream().map(FileDTO::new).collect(Collectors.toList());
+	}
 }

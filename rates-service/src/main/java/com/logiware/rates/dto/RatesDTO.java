@@ -1,5 +1,7 @@
 package com.logiware.rates.dto;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -10,12 +12,10 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 @Getter(value = AccessLevel.PUBLIC)
 @Setter(value = AccessLevel.PUBLIC)
-public class ResultModel {
+public class RatesDTO {
 
-	private String filename;
-	private String loadedDate;
-	private String sites;
-	private String errors;
-	private Long id;
-	
+	private String shipmentType;
+	private String rateType;
+	private String partnerIds;
+	private MultipartFile file;
 }

@@ -10,7 +10,7 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 @Getter(value = AccessLevel.PUBLIC)
 @Setter(value = AccessLevel.PUBLIC)
-public class KeyValue {
+public class KeyValueDTO {
 
 	private Object key;
 	private Object value;

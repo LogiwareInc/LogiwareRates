@@ -1,5 +1,6 @@
 package com.logiware.rates.controller;
 
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -21,8 +23,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.logiware.rates.constant.SecurityConstants;
-import com.logiware.rates.dto.KeyValue;
-import com.logiware.rates.dto.Rates;
+import com.logiware.rates.dto.FileDTO;
+import com.logiware.rates.dto.KeyValueDTO;
+import com.logiware.rates.dto.RatesDTO;
 import com.logiware.rates.entity.Company;
 import com.logiware.rates.service.CompanyService;
 import com.logiware.rates.service.RatesService;
@@ -75,10 +78,10 @@ public class RatesController {
 			if (company == null) {
 				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
 			}
-			List<KeyValue> partners = new ArrayList<>();
-			partners.add(new KeyValue(company.getId(), company.getName()));
+			List<KeyValueDTO> partners = new ArrayList<>();
+			partners.add(new KeyValueDTO(company.getId(), company.getName()));
 			company.getPartners().forEach(partner -> {
-				partners.add(new KeyValue(partner.getPartner().getId(), partner.getPartner().getName()));
+				partners.add(new KeyValueDTO(partner.getPartner().getId(), partner.getPartner().getName()));
 			});
 			return ResponseEntity.ok().body(partners);
 		} catch (Exception e) {
@@ -88,19 +91,19 @@ public class RatesController {
 	}
 
 	@PostMapping(value = "/load")
-	@ApiOperation(value = "Load Rates")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates are loaded Successfully", response = Map.class),
+	@ApiOperation(value = "Load RatesDTO")
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "RatesDTO are loaded Successfully", response = Map.class),
 			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
 	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
-	public @ResponseBody ResponseEntity<?> loadRates(@ModelAttribute Rates rates, HttpServletRequest req) {
+	public @ResponseBody ResponseEntity<?> loadRates(@ModelAttribute RatesDTO rates, HttpServletRequest req) {
 		try {
 			Company company = companyService.whoami(req);
 			if (company == null) {
 				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
 			}
-			Map<String, List<KeyValue>> errors = ratesService.loadRates(company, rates);
+			Map<String, List<KeyValueDTO>> errors = ratesService.loadRates(company, rates);
 			Map<String, Object> response = new HashMap<>();
-			response.put("message", "Rates are loaded successfully");
+			response.put("message", "RatesDTO are loaded successfully");
 			if (!errors.isEmpty()) {
 				response.put("errors", errors);
 			}
@@ -111,24 +114,19 @@ public class RatesController {
 		}
 	}
 
-	@PostMapping(value = "/find")
-	@ApiOperation(value = "Find Rates")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates are loaded Successfully", response = Map.class),
+	@PostMapping(value = "/find/{loadedDate}")
+	@ApiOperation(value = "Find RatesDTO")
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "RatesDTO List", response = Map.class),
 			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
 	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
-	public @ResponseBody ResponseEntity<?> findRates(@ModelAttribute Rates rates, HttpServletRequest req) {
+	public @ResponseBody ResponseEntity<?> findRates(@PathVariable String loadedDate, HttpServletRequest req) {
 		try {
 			Company company = companyService.whoami(req);
 			if (company == null) {
 				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
 			}
-			Map<String, List<KeyValue>> errors = ratesService.loadRates(company, rates);
-			Map<String, Object> response = new HashMap<>();
-			response.put("message", "Rates are loaded successfully");
-			if (!errors.isEmpty()) {
-				response.put("errors", errors);
-			}
-			return ResponseEntity.ok().body(response);
+			List<FileDTO> files = ratesService.findRates(loadedDate);
+			return ResponseEntity.ok().body(files);
 		} catch (Exception e) {
 			e.printStackTrace();
 			return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
@@ -136,22 +134,19 @@ public class RatesController {
 	}	
 
 	@PostMapping(value = "/download")
-	@ApiOperation(value = "Download Rates")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates are loaded Successfully", response = Map.class),
+	@ApiOperation(value = "Download RatesDTO")
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "RatesDTO are downloaded", response = Map.class),
 			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
 	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
-	public @ResponseBody ResponseEntity<?> downloadRates(@ModelAttribute Rates rates, HttpServletRequest req) {
+	public @ResponseBody ResponseEntity<?> downloadRates(Long id, HttpServletRequest req) {
 		try {
 			Company company = companyService.whoami(req);
 			if (company == null) {
 				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
 			}
-			Map<String, List<KeyValue>> errors = ratesService.loadRates(company, rates);
+			//Map<String, List<KeyValueDTO>> errors = ratesService.loadRates(company, rates);
 			Map<String, Object> response = new HashMap<>();
-			response.put("message", "Rates are loaded successfully");
-			if (!errors.isEmpty()) {
-				response.put("errors", errors);
-			}
+			response.put("message", "RatesDTO are loaded successfully");
 			return ResponseEntity.ok().body(response);
 		} catch (Exception e) {
 			e.printStackTrace();

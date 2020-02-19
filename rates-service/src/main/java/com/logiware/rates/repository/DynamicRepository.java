@@ -18,7 +18,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.logiware.rates.datasource.DataSourceManager;
-import com.logiware.rates.dto.KeyValue;
+import com.logiware.rates.dto.KeyValueDTO;
 import com.mysql.cj.jdbc.StatementImpl;
 
 @Service
@@ -27,7 +27,7 @@ public class DynamicRepository {
 	@Autowired
 	private DataSourceManager dataSourceManager;
 
-	public List<KeyValue> getOptionResults(String dbUrl, String dbUser, String dbPassword, String query,
+	public List<KeyValueDTO> getOptionResults(String dbUrl, String dbUser, String dbPassword, String query,
 			Map<String, Object> params) throws SQLException {
 		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
 		NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
@@ -38,23 +38,23 @@ public class DynamicRepository {
 			});
 		}
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, parameterSource);
-		List<KeyValue> results = new ArrayList<>();
+		List<KeyValueDTO> results = new ArrayList<>();
 		for (Map<String, Object> row : rows) {
-			results.add(new KeyValue((String) row.get("col1"), (String) row.get("col2")));
+			results.add(new KeyValueDTO((String) row.get("col1"), (String) row.get("col2")));
 		}
 		return results;
 	}
 
-	public List<KeyValue> getTypeaheadResults(String dbUrl, String dbUser, String dbPassword, String query,
+	public List<KeyValueDTO> getTypeaheadResults(String dbUrl, String dbUser, String dbPassword, String query,
 			String input) throws SQLException {
 		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
 		NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
 		MapSqlParameterSource parameterSource = new MapSqlParameterSource();
 		parameterSource.addValue("input", input + "%");
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, parameterSource);
-		List<KeyValue> results = new ArrayList<>();
+		List<KeyValueDTO> results = new ArrayList<>();
 		for (Map<String, Object> row : rows) {
-			results.add(new KeyValue((String) row.get("col1"), (String) row.get("col2")));
+			results.add(new KeyValueDTO((String) row.get("col1"), (String) row.get("col2")));
 		}
 		return results;
 	}

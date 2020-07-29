@@ -1,6 +1,9 @@
 package com.logiware.rates.controller;
 
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,6 +15,9 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -22,11 +28,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.google.common.net.HttpHeaders;
 import com.logiware.rates.constant.SecurityConstants;
 import com.logiware.rates.dto.FileDTO;
 import com.logiware.rates.dto.KeyValueDTO;
 import com.logiware.rates.dto.RatesDTO;
 import com.logiware.rates.entity.Company;
+import com.logiware.rates.entity.File;
 import com.logiware.rates.service.CompanyService;
 import com.logiware.rates.service.RatesService;
 
@@ -91,8 +99,8 @@ public class RatesController {
 	}
 
 	@PostMapping(value = "/load")
-	@ApiOperation(value = "Load RatesDTO")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "RatesDTO are loaded Successfully", response = Map.class),
+	@ApiOperation(value = "Load Rates")
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates are loaded Successfully", response = Map.class),
 			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
 	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
 	public @ResponseBody ResponseEntity<?> loadRates(@ModelAttribute RatesDTO rates, HttpServletRequest req) {
@@ -103,7 +111,7 @@ public class RatesController {
 			}
 			Map<String, List<KeyValueDTO>> errors = ratesService.loadRates(company, rates);
 			Map<String, Object> response = new HashMap<>();
-			response.put("message", "RatesDTO are loaded successfully");
+			response.put("message", "Rates are loaded successfully");
 			if (!errors.isEmpty()) {
 				response.put("errors", errors);
 			}
@@ -115,8 +123,8 @@ public class RatesController {
 	}
 
 	@PostMapping(value = "/find/{loadedDate}")
-	@ApiOperation(value = "Find RatesDTO")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "RatesDTO List", response = Map.class),
+	@ApiOperation(value = "Find Rates")
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates List", response = Map.class),
 			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
 	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
 	public @ResponseBody ResponseEntity<?> findRates(@PathVariable String loadedDate, HttpServletRequest req) {
@@ -134,8 +142,8 @@ public class RatesController {
 	}	
 
 	@PostMapping(value = "/download")
-	@ApiOperation(value = "Download RatesDTO")
-	@ApiResponses(value = { @ApiResponse(code = 200, message = "RatesDTO are downloaded", response = Map.class),
+	@ApiOperation(value = "Download Rates")
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates are downloaded", response = Map.class),
 			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
 	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
 	public @ResponseBody ResponseEntity<?> downloadRates(Long id, HttpServletRequest req) {
@@ -144,10 +152,13 @@ public class RatesController {
 			if (company == null) {
 				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
 			}
-			//Map<String, List<KeyValueDTO>> errors = ratesService.loadRates(company, rates);
-			Map<String, Object> response = new HashMap<>();
-			response.put("message", "RatesDTO are loaded successfully");
-			return ResponseEntity.ok().body(response);
+			File file = ratesService.findById(id);
+			Path path = Paths.get(file.getPath());
+			Resource resource = new UrlResource(path.toUri());
+			return ResponseEntity.ok()
+					.contentType(MediaType.parseMediaType(Files.probeContentType(path)))
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+					.body(resource);
 		} catch (Exception e) {
 			e.printStackTrace();
 			return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));

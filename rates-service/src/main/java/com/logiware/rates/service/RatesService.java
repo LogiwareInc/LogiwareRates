@@ -200,7 +200,7 @@ public class RatesService {
 			builder.append("from");
 			builder.append("  `fcl_rate_temp` temp ");
 			builder.append("where temp.`carrier` <> '' ");
-			builder.append("group by temp.`scac_code`, temp.`contract_number`, temp.`type_of_rate`");
+			builder.append("group by temp.`carrier`, temp.`scac_code`, temp.`contract_number`, temp.`type_of_rate`");
 			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
 
 			builder.setLength(0);
@@ -210,7 +210,8 @@ public class RatesService {
 			builder.append("  `fcl_rate_temp` temp");
 			builder.append("  join `fcl_rate` rate");
 			builder.append("    on (");
-			builder.append("      rate.`scac` = temp.`scac_code` ");
+			builder.append("      rate.`carrier` = temp.`carrier` ");
+			builder.append("      and rate.`scac` = temp.`scac_code` ");
 			builder.append("      and rate.`contract_number` = temp.`contract_number`");
 			builder.append("      and rate.`type_of_rate` = temp.`type_of_rate`");
 			builder.append("    )");
@@ -279,12 +280,13 @@ public class RatesService {
 			builder.append("  `fcl_rate_temp` temp");
 			builder.append("  join `fcl_rate` rate");
 			builder.append("    on (");
-			builder.append("      rate.`scac` = temp.`scac_code` ");
+			builder.append("      rate.`carrier` = temp.`carrier` ");
+			builder.append("      and rate.`scac` = temp.`scac_code` ");
 			builder.append("      and rate.`contract_number` = temp.`contract_number`");
 			builder.append("      and rate.`type_of_rate` = temp.`type_of_rate`");
 			builder.append("    ) ");
 			builder.append("where temp.`carrier` <> '' ");
-			builder.append("group by temp.`scac_code`, temp.`contract_number`, temp.`type_of_rate`, temp.`pol_code`, temp.`pod_code`");
+			builder.append("group by temp.`carrier`, temp.`scac_code`, temp.`contract_number`, temp.`type_of_rate`, temp.`pol_code`, temp.`pod_code`");
 			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
 
 			builder.setLength(0);
@@ -560,5 +562,9 @@ public class RatesService {
 			files = fileRepository.findAll();
 		}
 		return files.stream().map(FileDTO::new).collect(Collectors.toList());
+	}
+	
+	public File findById(Long id) {
+		return fileRepository.getOne(id);
 	}
 }

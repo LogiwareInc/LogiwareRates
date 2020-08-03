@@ -12,6 +12,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -47,6 +48,8 @@ import com.logiware.rates.util.StringUtils;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
 
+import javassist.NotFoundException;
+
 @Service
 public class RatesService {
 
@@ -69,6 +72,7 @@ public class RatesService {
 	private static final char QUOTE_CHARACTER = '"';
 	private static final char ESCAPE_CHARACTER = '"';
 	private static final String LINE_END = "\r\n";
+	private static final String ALPHANUMERIC = "[^a-zA-Z0-9]";
 
 	private java.io.File xls2csv(java.io.File xlsFile) throws IOException {
 		String path = xlsFile.getPath();
@@ -130,7 +134,7 @@ public class RatesService {
 		return csvFile;
 	}
 
-	public void loadFclFreightRates(Company company, java.io.File file) throws FileNotFoundException, IOException, SQLException {
+	public void loadFclFreightRates(Company company, java.io.File file) throws IOException, SQLException, NotFoundException {
 		StringBuilder tableBuilder = new StringBuilder();
 		tableBuilder.append("create table `fcl_rate_temp` (");
 		tableBuilder.append("  `id` int(10) not null auto_increment,");
@@ -155,8 +159,8 @@ public class RatesService {
 			}
 			for (String header : headers) {
 				if (StringUtils.isNotEmpty(header)) {
-					tableBuilder.append("  `").append(header.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_")).append("`");
-					loadBuilder.append(" `").append(header.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_")).append("`,");
+					tableBuilder.append("  `").append(header.toLowerCase().replaceAll(ALPHANUMERIC, "_")).append("`");
+					loadBuilder.append(" `").append(header.toLowerCase().replaceAll(ALPHANUMERIC, "_")).append("`,");
 					if (containerSizes.stream().anyMatch(header::contains)) {
 						String chargeCode = StringUtils.substringBefore(header, " ");
 						if (StringUtils.isNotEqual(chargeCode, "Total")) {
@@ -179,11 +183,33 @@ public class RatesService {
 			loadBuilder.setLength(loadBuilder.length() - 1);
 			loadBuilder.append(")");
 			String dropQuery = "drop table if exists `fcl_rate_temp`";
+			String alterQuery = "alter table `transborder_usa_prod`.`fcl_rate_temp` add index `fcl_rate_temp_carrier_type_of_rate_idx` (`carrier`, `type_of_rate`)";
 			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), dropQuery);
+			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), alterQuery);
 			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), tableBuilder.toString());
 			dynamicRepository.loadLocalInfile(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), loadBuilder.toString(), FileUtils.openInputStream(file));
 
 			StringBuilder builder = new StringBuilder();
+			builder.append("select");
+			builder.append("  r.`carrier` as col1,");
+			builder.append("  r.`type_of_rate` as col2 ");
+			builder.append("from");
+			builder.append("  `fcl_rate_temp` r");
+			builder.append("  left join `trading_partner` t");
+			builder.append("    on (t.`account_name` = concat(r.`carrier`, ' - ', r.`type_of_rate`))");
+			builder.append("where r.`carrier` <> '' and t.`id` is null ");
+			builder.append("group by r.`carrier`, r.`type_of_rate`");
+			List<KeyValueDTO> carriers = dynamicRepository.getKeyValueResults(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
+			if (Objects.nonNull(carriers) && !carriers.isEmpty()) {
+				StringBuilder errors = new StringBuilder();
+				errors.append("The following carriers not found in " + company.getName() + " ");
+				carriers.forEach(kv -> {
+					errors.append(kv.getKey() + " - " + kv.getValue()).append(",");
+				});
+				errors.setLength(errors.length() - 1);
+				throw new NotFoundException(errors.toString());
+			}
+			builder.setLength(0);
 			builder.append("insert ignore into `fcl_rate` (");
 			builder.append("  `carrier`,");
 			builder.append("  `scac`,");
@@ -300,7 +326,7 @@ public class RatesService {
 			boolean union = false;
 			for (String containerSize : freightRates.keySet()) {
 				for (String chargeCode : freightRates.get(containerSize)) {
-					String rateField = chargeCode.toLowerCase() + "_" + containerSize.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
+					String rateField = chargeCode.toLowerCase() + "_" + containerSize.toLowerCase().replaceAll(ALPHANUMERIC, "_");
 					if (union) {
 						builder.append(" union all");
 					}
@@ -361,8 +387,8 @@ public class RatesService {
 			}
 			for (String header : headers) {
 				if (StringUtils.isNotEmpty(header)) {
-					tableBuilder.append("  `").append(header.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_")).append("` varchar (100) null,");
-					loadBuilder.append("`").append(header.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_")).append("`,");
+					tableBuilder.append("  `").append(header.toLowerCase().replaceAll(ALPHANUMERIC, "_")).append("` varchar (100) null,");
+					loadBuilder.append("`").append(header.toLowerCase().replaceAll(ALPHANUMERIC, "_")).append("`,");
 					if (StringUtils.isNotEqual(header, "Matrix")) {
 						carriers.add(header);
 					}
@@ -384,7 +410,7 @@ public class RatesService {
 			boolean union = false;
 
 			for (String carrier : carriers) {
-				String field = carrier.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
+				String field = carrier.toLowerCase().replaceAll(ALPHANUMERIC, "_");
 				if (union) {
 					builder.append("    union all");
 				}
@@ -407,7 +433,7 @@ public class RatesService {
 
 			for (String carrier : carriers) {
 				builder.setLength(0);
-				String field = carrier.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
+				String field = carrier.toLowerCase().replaceAll(ALPHANUMERIC, "_");
 				builder.append("delete");
 				builder.append("  other ");
 				builder.append("from");
@@ -437,7 +463,7 @@ public class RatesService {
 			builder.append(") ");
 			union = false;
 			for (String carrier : carriers) {
-				String field = carrier.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
+				String field = carrier.toLowerCase().replaceAll(ALPHANUMERIC, "_");
 				if (union) {
 					builder.append(" union all");
 				}
@@ -475,7 +501,7 @@ public class RatesService {
 			builder.append(") ");
 			union = false;
 			for (String carrier : carriers) {
-				String field = carrier.toLowerCase().replaceAll("[^a-zA-Z0-9]", "_");
+				String field = carrier.toLowerCase().replaceAll(ALPHANUMERIC, "_");
 				for (String costType : costTypes) {
 					if (union) {
 						builder.append(" union all");
@@ -505,15 +531,15 @@ public class RatesService {
 		}
 	}
 
-	public Map<String, List<KeyValueDTO>> loadRates(Company company, RatesDTO rates) throws Exception {
+	public void loadRates(Company company, RatesDTO rates) throws Exception {
 		List<Long> ids = Stream.of(rates.getPartnerIds().split(",")).map(s -> Long.parseLong(s.trim())).collect(Collectors.toList());
 		List<Company> partners = companyRepository.findAllById(ids);
-		java.io.File directory = new java.io.File(uploadLocation + "/" + company.getName().replaceAll("[^a-zA-Z0-9]", "_"));
+		java.io.File directory = new java.io.File(uploadLocation + "/" + company.getName().replaceAll(ALPHANUMERIC, "_"));
 		if (!directory.exists()) {
 			directory.mkdirs();
 		}
 		MultipartFile sourceFile = rates.getFile();
-		String filename = FilenameUtils.getBaseName(sourceFile.getOriginalFilename()).replaceAll("[^a-zA-Z0-9]", "_");
+		String filename = FilenameUtils.getBaseName(sourceFile.getOriginalFilename()).replaceAll(ALPHANUMERIC, "_");
 		String extension = FilenameUtils.getExtension(sourceFile.getOriginalFilename());
 		java.io.File targetFile = new java.io.File(directory, filename + "_" + System.currentTimeMillis() + "." + extension);
 		sourceFile.transferTo(targetFile);
@@ -525,7 +551,6 @@ public class RatesService {
 		file.setRatesType(rates.getRateType());
 		file.setLoadedDate(new Date());
 		fileRepository.save(file);
-		Map<String, List<KeyValueDTO>> errors = new HashMap<>();
 		java.io.File csvFile;
 		if (FilenameUtils.isExtension(file.getName(), "xls")) {
 			csvFile = xls2csv(targetFile);
@@ -544,12 +569,7 @@ public class RatesService {
 			} else {
 				loadFclOtherRates(partner, csvFile);
 			}
-//			List<KeyValueDTO> error = findErrors(file.getCarrier(), company);
-//			if (error != null && !error.isEmpty()) {
-//				errors.put(company.getName(), error);
-//			}
 		}
-		return errors;
 	}
 
 	public List<FileDTO> findRates(String loadedDate) throws ParseException {
@@ -563,7 +583,7 @@ public class RatesService {
 		}
 		return files.stream().map(FileDTO::new).collect(Collectors.toList());
 	}
-	
+
 	public File findById(Long id) {
 		return fileRepository.getOne(id);
 	}

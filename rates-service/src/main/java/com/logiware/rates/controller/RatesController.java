@@ -6,7 +6,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -109,13 +108,8 @@ public class RatesController {
 			if (company == null) {
 				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
 			}
-			Map<String, List<KeyValueDTO>> errors = ratesService.loadRates(company, rates);
-			Map<String, Object> response = new HashMap<>();
-			response.put("message", "Rates are loaded successfully");
-			if (!errors.isEmpty()) {
-				response.put("errors", errors);
-			}
-			return ResponseEntity.ok().body(response);
+			ratesService.loadRates(company, rates);
+			return ResponseEntity.ok().body(Collections.singletonMap("message", "Rates are loaded successfully"));
 		} catch (Exception e) {
 			e.printStackTrace();
 			return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));

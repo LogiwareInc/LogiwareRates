@@ -1,5 +1,7 @@
 package com.logiware.rates.util;
 
+import java.math.BigDecimal;
+
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DateUtil;
@@ -24,7 +26,8 @@ public class ExcelUtils {
 		if (DateUtil.isCellDateFormatted(cell)) {
 			return DateUtils.formatToString(cell.getDateCellValue(), datePattern);
 		} else {
-			return String.valueOf(cell.getNumericCellValue());
+			return new BigDecimal(cell.getNumericCellValue()).toPlainString();
+			//return String.valueOf(cell.getNumericCellValue());
 		}
 	}
 
@@ -58,4 +61,5 @@ public class ExcelUtils {
 			return getStringValue(cell);
 		}
 	}
+
 }

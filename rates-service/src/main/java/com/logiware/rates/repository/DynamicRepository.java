@@ -59,6 +59,17 @@ public class DynamicRepository {
 		return results;
 	}
 
+	public List<KeyValueDTO> getKeyValueResults(String dbUrl, String dbUser, String dbPassword, String query) throws SQLException {
+		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);
+		NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
+		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, new MapSqlParameterSource());
+		List<KeyValueDTO> results = new ArrayList<>();
+		for (Map<String, Object> row : rows) {
+			results.add(new KeyValueDTO((String) row.get("col1"), (String) row.get("col2")));
+		}
+		return results;
+	}
+
 	public int executeUpdate(String dbUrl, String dbUser, String dbPassword, String query,
 			MapSqlParameterSource parameterSource) {
 		DataSource dataSource = dataSourceManager.dataSource(dbUrl, dbUser, dbPassword);

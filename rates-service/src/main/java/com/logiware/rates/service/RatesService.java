@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -196,17 +197,19 @@ public class RatesService {
 			builder.append("from");
 			builder.append("  `fcl_rate_temp` r");
 			builder.append("  left join `trading_partner` t");
-			builder.append("    on (t.`account_name` = concat(r.`carrier`, ' - ', r.`type_of_rate`))");
+			builder.append("    on (t.`account_name` = concat(r.`carrier`, ' - ', r.`type_of_rate`)) ");
 			builder.append("where r.`carrier` <> '' and t.`id` is null ");
 			builder.append("group by r.`carrier`, r.`type_of_rate`");
 			List<KeyValueDTO> carriers = dynamicRepository.getKeyValueResults(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
 			if (Objects.nonNull(carriers) && !carriers.isEmpty()) {
 				StringBuilder errors = new StringBuilder();
-				errors.append("The following carriers not found in " + company.getName() + " ");
+				errors.append("The following carriers does not exist in TP, cannot load rates.");
+				AtomicInteger counter = new AtomicInteger(1);
 				carriers.forEach(kv -> {
-					errors.append(kv.getKey() + " - " + kv.getValue()).append(",");
+					errors.append("<br>" + counter.get() + ") ").append(kv.getKey() + " - " + kv.getValue());
+					counter.getAndIncrement();
 				});
-				errors.setLength(errors.length() - 1);
+				errors.append("<br>Please use the name that exists in TP setup for " + company.getName());
 				throw new NotFoundException(errors.toString());
 			}
 			builder.setLength(0);

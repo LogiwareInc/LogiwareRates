@@ -184,7 +184,7 @@ public class RatesService {
 			loadBuilder.setLength(loadBuilder.length() - 1);
 			loadBuilder.append(")");
 			String dropQuery = "drop table if exists `fcl_rate_temp`";
-			String alterQuery = "alter table `transborder_usa_prod`.`fcl_rate_temp` add index `fcl_rate_temp_carrier_type_of_rate_idx` (`carrier`, `type_of_rate`)";
+			String alterQuery = "alter table `fcl_rate_temp` add index `fcl_rate_temp_carrier_type_of_rate_idx` (`carrier`, `type_of_rate`)";
 			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), dropQuery);
 			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), alterQuery);
 			dynamicRepository.executeUpdate(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), tableBuilder.toString());

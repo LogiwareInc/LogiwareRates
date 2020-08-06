@@ -25,9 +25,9 @@ spring:
 spring:   
  profiles: stg 
  datasource: 
-    url: jdbc:mysql://35.200.181.132:3306/logiware_rates 
-    username: root 
-    password: Password123
+    url: jdbc:mysql://35.196.165.140:3306/logiware_rates
+    username: logiware 
+    password: j6qP97t1G68l36Y
     hikari:
       connectionTimeout: 30000
       idleTimeout: 300000
@@ -48,7 +48,7 @@ spring:
 spring:   
  profiles: prd 
  datasource: 
-    url: jdbc:mysql://35.196.165.140:3306/logiware_rates 
+    url: jdbc:mysql://35.196.165.140:3306/logiware_rates_prod
     username: logiware 
     password: j6qP97t1G68l36Y     
     hikari:

@@ -16,7 +16,7 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 @Getter(value = AccessLevel.PUBLIC)
 @Setter(value = AccessLevel.PUBLIC)
-public class FileDTO {
+public class FileResponse {
 
 	private String shipmentType;
 	private String ratesType;
@@ -26,7 +26,7 @@ public class FileDTO {
 	private String errors;
 	private Long id;
 
-	public FileDTO(File file) {
+	public FileResponse(File file) {
 		switch (file.getShipmentType()) {
 		case "F":
 			this.shipmentType = "FCL";

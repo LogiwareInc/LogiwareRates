@@ -33,9 +33,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.logiware.rates.dto.FileDTO;
-import com.logiware.rates.dto.KeyValueDTO;
-import com.logiware.rates.dto.RatesDTO;
+import com.logiware.rates.dto.FileResponse;
+import com.logiware.rates.dto.KeyValueResult;
+import com.logiware.rates.dto.UploadRequest;
 import com.logiware.rates.entity.Company;
 import com.logiware.rates.entity.File;
 import com.logiware.rates.entity.History;
@@ -192,15 +192,15 @@ public class RatesService {
 
 			StringBuilder builder = new StringBuilder();
 			builder.append("select");
-			builder.append("  r.`carrier` as col1,");
-			builder.append("  r.`type_of_rate` as col2 ");
+			builder.append("  r.`carrier` as `key`,");
+			builder.append("  r.`type_of_rate` as `value` ");
 			builder.append("from");
 			builder.append("  `fcl_rate_temp` r");
 			builder.append("  left join `trading_partner` t");
 			builder.append("    on (t.`account_name` = concat(r.`carrier`, ' - ', r.`type_of_rate`)) ");
 			builder.append("where r.`carrier` <> '' and t.`id` is null ");
 			builder.append("group by r.`carrier`, r.`type_of_rate`");
-			List<KeyValueDTO> carriers = dynamicRepository.getKeyValueResults(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
+			List<KeyValueResult> carriers = dynamicRepository.getKeyValueResults(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), builder.toString());
 			if (Objects.nonNull(carriers) && !carriers.isEmpty()) {
 				StringBuilder errors = new StringBuilder();
 				errors.append("The following carriers does not exist in TP, cannot load rates.");
@@ -534,7 +534,7 @@ public class RatesService {
 		}
 	}
 
-	public void loadRates(Company company, RatesDTO rates) throws Exception {
+	public void loadRates(Company company, UploadRequest rates) throws Exception {
 		List<Long> ids = Stream.of(rates.getPartnerIds().split(",")).map(s -> Long.parseLong(s.trim())).collect(Collectors.toList());
 		List<Company> partners = companyRepository.findAllById(ids);
 		java.io.File directory = new java.io.File(uploadLocation + "/" + company.getName().replaceAll(ALPHANUMERIC, "_"));
@@ -575,7 +575,7 @@ public class RatesService {
 		}
 	}
 
-	public List<FileDTO> findRates(String loadedDate) throws ParseException {
+	public List<FileResponse> findRates(String loadedDate) throws ParseException {
 		List<File> files;
 		if (StringUtils.isNotEmpty(loadedDate)) {
 			Date start = DateUtils.parseToDate(loadedDate, "MM/dd/yyyy 00:00:00");
@@ -584,7 +584,7 @@ public class RatesService {
 		} else {
 			files = fileRepository.findAll();
 		}
-		return files.stream().map(FileDTO::new).collect(Collectors.toList());
+		return files.stream().map(FileResponse::new).collect(Collectors.toList());
 	}
 
 	public File findById(Long id) {

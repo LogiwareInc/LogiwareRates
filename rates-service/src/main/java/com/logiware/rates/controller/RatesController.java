@@ -29,9 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.google.common.net.HttpHeaders;
 import com.logiware.rates.constant.SecurityConstants;
-import com.logiware.rates.dto.FileDTO;
-import com.logiware.rates.dto.KeyValueDTO;
-import com.logiware.rates.dto.RatesDTO;
+import com.logiware.rates.dto.FileResponse;
+import com.logiware.rates.dto.KeyValueResult;
+import com.logiware.rates.dto.UploadRequest;
 import com.logiware.rates.entity.Company;
 import com.logiware.rates.entity.File;
 import com.logiware.rates.service.CompanyService;
@@ -85,10 +85,10 @@ public class RatesController {
 			if (company == null) {
 				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
 			}
-			List<KeyValueDTO> partners = new ArrayList<>();
-			partners.add(new KeyValueDTO(company.getId(), company.getName()));
+			List<KeyValueResult> partners = new ArrayList<>();
+			partners.add(new KeyValueResult(company.getId(), company.getName()));
 			company.getPartners().forEach(partner -> {
-				partners.add(new KeyValueDTO(partner.getPartner().getId(), partner.getPartner().getName()));
+				partners.add(new KeyValueResult(partner.getPartner().getId(), partner.getPartner().getName()));
 			});
 			return ResponseEntity.ok().body(partners);
 		} catch (Exception e) {
@@ -102,7 +102,7 @@ public class RatesController {
 	@ApiResponses(value = { @ApiResponse(code = 200, message = "Rates are loaded Successfully", response = Map.class),
 			@ApiResponse(code = 400, message = "Invalid Company Name", response = Map.class) })
 	@ApiImplicitParams({ @ApiImplicitParam(name = SecurityConstants.TOKEN_NAME, required = true, dataType = "string", paramType = "header") })
-	public @ResponseBody ResponseEntity<?> loadRates(@ModelAttribute RatesDTO rates, HttpServletRequest req) {
+	public @ResponseBody ResponseEntity<?> loadRates(@ModelAttribute UploadRequest rates, HttpServletRequest req) {
 		try {
 			Company company = companyService.whoami(req);
 			if (company == null) {
@@ -127,7 +127,7 @@ public class RatesController {
 			if (company == null) {
 				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
 			}
-			List<FileDTO> files = ratesService.findRates(loadedDate);
+			List<FileResponse> files = ratesService.findRates(loadedDate);
 			return ResponseEntity.ok().body(files);
 		} catch (Exception e) {
 			e.printStackTrace();

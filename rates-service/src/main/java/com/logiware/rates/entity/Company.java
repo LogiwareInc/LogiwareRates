@@ -66,6 +66,10 @@ public class Company implements Serializable {
 	@Column(name = "created_date")
 	@Temporal(TemporalType.TIMESTAMP)
 	private Date createdDate;
+	@Column(name = "catapult_user")
+	private String catapultUser;
+	@Column(name = "catapult_password")
+	private String catapultPassword;
 	@OneToMany(cascade = CascadeType.ALL, mappedBy = "company")
 	private List<Partner> partners;
 	@OneToMany(cascade = CascadeType.ALL, mappedBy = "company")

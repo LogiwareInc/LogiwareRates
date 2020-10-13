@@ -18,5 +18,45 @@
     "name": "spring.security.jwt.token.granted-roles",
     "type": "java.lang.String",
     "description": "A description for 'spring.security.jwt.token.granted-roles'"
+  },
+  {
+    "name": "catapult.service.url",
+    "type": "java.lang.String",
+    "description": "A description for 'catapult.service.url'"
+  },
+  {
+    "name": "query.select.charge-code",
+    "type": "java.lang.String",
+    "description": "A description for 'query.select.charge-code'"
+  },
+  {
+    "name": "query.select.unit-type-all",
+    "type": "java.lang.String",
+    "description": "A description for 'query.select.unit-type-all'"
+  },
+  {
+    "name": "query.select.container-size-all",
+    "type": "java.lang.String",
+    "description": "A description for 'query.select.container-size-all'"
+  },
+  {
+    "name": "trading-partner-by-scac",
+    "type": "java.lang.String",
+    "description": "A description for 'trading-partner-by-scac'"
+  },
+  {
+    "name": "query.select.trading-partner-by-scac",
+    "type": "java.lang.String",
+    "description": "A description for 'query.select.trading-partner-by-scac'"
+  },
+  {
+    "name": "query.select.charge-code-by-code",
+    "type": "java.lang.String",
+    "description": "A description for 'query.select.charge-code-by-code'"
+  },
+  {
+    "name": "query.select.charge-code-all",
+    "type": "java.lang.String",
+    "description": "A description for 'query.select.charge-code-all'"
   }
 ]}

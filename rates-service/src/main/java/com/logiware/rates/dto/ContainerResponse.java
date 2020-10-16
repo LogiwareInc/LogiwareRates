@@ -30,19 +30,19 @@ public class ContainerResponse {
 		this.currency = shipQuote.getCurrency();
 		this.currentCharges = new LinkedHashMap<>();
 		this.futureCharges = new LinkedHashMap<>();
-		shipQuote.getSellChargesCollection()
+		shipQuote.getChargesCollection()
 			.forEach(charge -> {
 				if ("BR".equalsIgnoreCase(charge.getSurchargeCode())) {
 					charge.setSurchargeCode((String) freightCharge.getKey());
 					charge.setDescription((String) freightCharge.getValue());
 				}
 			});
-		shipQuote.getSellChargesCollection().forEach(charge -> charge.setMissing(!chargeCodes.contains(charge.getSurchargeCode())));
-		this.currentCharges.putAll(shipQuote.getSellChargesCollection()
+		shipQuote.getChargesCollection().forEach(charge -> charge.setMissing(!chargeCodes.contains(charge.getSurchargeCode())));
+		this.currentCharges.putAll(shipQuote.getChargesCollection()
 			.stream()
 			.filter(charge -> "CURRENT".equalsIgnoreCase(charge.getType()))
 			.collect(Collectors.toMap(ChargeResponse::getSurchargeCode, charge -> charge)));
-		this.futureCharges.putAll(shipQuote.getSellChargesCollection()
+		this.futureCharges.putAll(shipQuote.getChargesCollection()
 			.stream()
 			.filter(charge -> "FUTURE".equalsIgnoreCase(charge.getType()))
 			.collect(Collectors.toMap(ChargeResponse::getSurchargeCode, charge -> charge)));

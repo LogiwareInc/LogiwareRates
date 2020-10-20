@@ -56,6 +56,7 @@ public class CatapultService {
 			.build());
 		request.setServiceType("ALL");
 		request.setShipmentType("OXX");
+		request.setUseCityLinking(true);
 		String shipmentSize = request.getShipmentSize();
 		List<String> chargeCodes = dynamicRepository.getSingleValueList(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), chargeCodeAllSql);
 		Map<String, String> containerSizes = dynamicRepository.getKeyValueResults(company.getDbUrl(), company.getDbUser(), company.getDbPassword(), containerSizeSql)

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.logiware.rates.constant.SecurityConstants;
 import com.logiware.rates.dto.RateRequest;
+import com.logiware.rates.dto.RateResponse;
 import com.logiware.rates.entity.Company;
 import com.logiware.rates.service.CatapultService;
 import com.logiware.rates.service.CompanyService;
@@ -50,7 +51,8 @@ public class CatapultController {
 			if (company == null) {
 				return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Invalid Company Name"));
 			}
-			return ResponseEntity.ok().body(catapultService.getRates(company, request));
+			List<RateResponse> rates = catapultService.getRates(company, request);
+			return ResponseEntity.ok().body(rates);
 		} catch (Exception e) {
 			e.printStackTrace();
 			return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));

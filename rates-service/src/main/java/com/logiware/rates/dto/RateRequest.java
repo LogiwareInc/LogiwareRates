@@ -78,5 +78,7 @@ public class RateRequest {
 	Boolean multi48;
 	@JsonInclude(Include.NON_NULL)
 	Boolean multi53;
+	@JsonInclude(Include.NON_NULL)
+	Boolean useCityLinking;
 
 }

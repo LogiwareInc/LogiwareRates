@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.BeanUtils;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.logiware.rates.entity.Company;
 import com.logiware.rates.repository.DynamicRepository;
 import com.logiware.rates.util.StringUtils;
@@ -30,6 +31,7 @@ import lombok.ToString;
 @Setter(value = AccessLevel.PUBLIC)
 @EqualsAndHashCode
 @ToString(includeFieldNames = true)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class RateResponse {
 
 	UUID id;

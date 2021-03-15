@@ -80,5 +80,7 @@ public class RateRequest {
 	Boolean multi53;
 	@JsonInclude(Include.NON_NULL)
 	Boolean useCityLinking;
+	@JsonInclude(Include.NON_NULL)
+	ShipQuoteGround requestGround;
 
 }
